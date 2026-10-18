@@ -68,7 +68,7 @@ export function SitePage({
     <>
       <header className="site" ref={headerRef}>
         <h1>
-          <a href={siteUrl('')}>Optimal Wordle</a>
+          <a href={siteUrl('')}>Optimle</a>
         </h1>
         <nav aria-label="Site">
           {PAGES.map((p) => (

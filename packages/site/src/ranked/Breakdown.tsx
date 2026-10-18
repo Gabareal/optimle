@@ -105,7 +105,7 @@ export function Breakdown({ run, guesses, onNewRun }: { run: Run; guesses: strin
   const squares = scored.map((r) => tierEmoji(r.score)).join('');
   const share = async () => {
     try {
-      await navigator.clipboard.writeText(`Optimal Wordle · Ranked trainer ${total}/${max}\n${squares}`);
+      await navigator.clipboard.writeText(`Optimle · Ranked trainer ${total}/${max}\n${squares}`);
       setCopied(true);
     } catch {
       setCopied(false);

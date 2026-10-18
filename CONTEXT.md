@@ -54,7 +54,7 @@ The part of the site where a player is shown Game states from the Optimal strate
 _Avoid_: game mode, quiz
 
 **Visualiser**:
-The part of the site for exploring Decision trees, comparing Strategies and Openers, and trying What-if Guesses. It is the site's home page. The Visualiser and the Ranked trainer are the site's two **sub-sites**, and together they make up **Optimal Wordle**.
+The part of the site for exploring Decision trees, comparing Strategies and Openers, and trying What-if Guesses. It is the site's home page. The Visualiser and the Ranked trainer are the site's two **sub-sites**, and together they make up **Optimle**, the site.
 _Avoid_: explorer, viewer
 
 **Run**:

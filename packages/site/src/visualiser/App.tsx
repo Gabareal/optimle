@@ -97,7 +97,7 @@ export function App() {
 
   useEffect(() => {
     const where = state ? (route.tab === 'explore' ? '' : `${TABS.find((t) => t.id === route.tab)!.label} · `) : '';
-    document.title = `${where}Optimal Wordle tree`;
+    document.title = `${where}Visualiser · Optimle`;
   }, [state, route.tab]);
 
   if (error) {

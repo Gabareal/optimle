@@ -1,4 +1,4 @@
-# Optimal Wordle tree
+# Optimle
 
 A static website that shows the provably optimal Wordle strategy as an explorable
 Decision tree: open with **SALET**, and the 2,315 original Answers take **7,920**
