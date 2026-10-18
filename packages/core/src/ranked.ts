@@ -103,8 +103,9 @@ export function randomSeed(): string {
 }
 
 // ---------------------------------------------------------------------------
-// Scoring. PROVISIONAL: the "Scoring formula" ticket is still open; everything that
-// depends on the formula goes through scoreRound so it can be swapped in one place.
+// Scoring, as decided in the "Scoring formula" ticket: points fall linearly with the
+// absolute extra Expected guesses, from 100 at optimal to 0 at +0.5. The tier comes from
+// the points, and only an Also-optimal Guess scores 100.
 
 export const MAX_POINTS = 100;
 /** Extra Expected guesses at which a Round scores 0. */
@@ -124,11 +125,11 @@ export interface RoundScore {
 export function scoreRound(delta: number, size: number): RoundScore {
   const extra = delta / size;
   const points = Math.round(MAX_POINTS * Math.max(0, 1 - extra / ZERO_AT));
-  const tier: Tier = delta === 0 ? 'Optimal' : extra <= 0.05 ? 'Excellent' : extra <= 0.15 ? 'Good' : extra <= 0.3 ? 'OK' : 'Miss';
+  const tier: Tier = delta === 0 ? 'Optimal' : points >= 90 ? 'Excellent' : points >= 70 ? 'Good' : points >= 40 ? 'OK' : 'Miss';
   return { delta, extra, points, tier };
 }
 
-/** The shareable square for a Round. */
+/** The shareable square for a Round: green for optimal, yellow for Excellent or Good. */
 export function tierEmoji(s: RoundScore): string {
-  return s.tier === 'Optimal' ? '🟩' : s.points >= 50 ? '🟨' : '⬛';
+  return s.tier === 'Optimal' ? '🟩' : s.tier === 'Excellent' || s.tier === 'Good' ? '🟨' : '⬛';
 }

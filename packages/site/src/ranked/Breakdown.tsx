@@ -135,7 +135,7 @@ export function Breakdown({ run, guesses, onNewRun }: { run: Run; guesses: strin
             <CopyIcon />
           </button>
         </div>
-        <span className="small muted">Enter starts a new Run. Points are provisional: the scoring formula isn't final yet.</span>
+        <span className="small muted">Enter starts a new Run.</span>
       </div>
       <div className="rk-cards">
         {scored.map((r, i) => (

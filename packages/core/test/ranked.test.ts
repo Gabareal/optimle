@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { deriveTree, drawRun, eligibleStates, firstRow, scoreRound, turnOf, type TreeFile } from '../src/index.js';
+import { deriveTree, drawRun, eligibleStates, firstRow, scoreRound, tierEmoji, turnOf, type TreeFile } from '../src/index.js';
 
 const salet = deriveTree(
   (JSON.parse(readFileSync(fileURLToPath(new URL('../../site/public/data/tree.salet.json', import.meta.url)), 'utf8')) as TreeFile)
@@ -49,7 +49,7 @@ describe('drawRun', () => {
   });
 });
 
-describe('scoreRound (provisional formula)', () => {
+describe('scoreRound', () => {
   it('gives full marks only to optimal Guesses and zero from +0.5 Expected guesses', () => {
     expect(scoreRound(0, 10)).toMatchObject({ points: 100, tier: 'Optimal', extra: 0 });
     expect(scoreRound(1, 100)).toMatchObject({ points: 98, tier: 'Excellent' });
@@ -57,5 +57,16 @@ describe('scoreRound (provisional formula)', () => {
     expect(scoreRound(3, 10)).toMatchObject({ points: 40, tier: 'OK' });
     expect(scoreRound(5, 10)).toMatchObject({ points: 0, tier: 'Miss' });
     expect(scoreRound(10, 10).points).toBe(0);
+  });
+
+  it('never gives 100 to a non-optimal Guess, even the closest possible one', () => {
+    expect(scoreRound(1, 221)).toMatchObject({ points: 99, tier: 'Excellent' });
+  });
+
+  it('derives tiers and squares from the points', () => {
+    // +0.15 is 70 (Good); +0.333 at a 3-Candidate state is 33 (Miss).
+    expect(scoreRound(3, 20)).toMatchObject({ points: 70, tier: 'Good' });
+    expect(scoreRound(1, 3)).toMatchObject({ points: 33, tier: 'Miss' });
+    expect([0, 1, 3, 6, 10].map((d) => tierEmoji(scoreRound(d, 20))).join('')).toBe('🟩🟨🟨⬛⬛');
   });
 });

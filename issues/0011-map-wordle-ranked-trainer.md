@@ -20,7 +20,7 @@ A build-ready spec for the **Ranked trainer**: a sub-site of the existing static
   - **Guesses:** any of the 12,972 allowed Guesses. No timer, no hints.
   - **"Ranked" without a backend:** a final score, a personal best and history kept in the browser, and a daily seeded Run (the same states for everyone, with a shareable result) alongside free play.
   - **Reveals come at the end of the Run**, not after each Round: a breakdown per Round with the optimal Guess(es), what your Guess cost, the top alternatives, and an "Open in Visualiser" link to that Game state.
-- **Built ahead of the last two tickets** (gabrielng, 2026-10-18): the trainer is coded from the decisions so far. Scoring uses the provisional formula in `packages/core/src/ranked.ts` (`scoreRound`: 100 × max(0, 1 − extra / 0.5), with tiers), which is the one place [Scoring formula](0016-scoring-formula.md) changes. Only free play ships, with a copyable result; [Daily Run and sharing](0017-daily-run-and-sharing.md) adds the Daily Run, history and personal best.
+- **Built ahead of the Daily Run ticket** (gabrielng, 2026-10-18): the trainer is coded from the decisions so far. Scoring follows [Scoring formula](0016-scoring-formula.md), in `scoreRound` in `packages/core/src/ranked.ts`. Only free play ships, with a copyable result; [Daily Run and sharing](0017-daily-run-and-sharing.md) adds the Daily Run, history and personal best.
 - Skills: grilling and domain-modeling for grilling tickets; prototype for prototype tickets; research for research tickets.
 - Tracker: local markdown in `issues/` (see `issues/README.md`).
 
@@ -30,6 +30,7 @@ A build-ready spec for the **Ranked trainer**: a sub-site of the existing static
 - [Draw weighting and depth schedule feel](0013-draw-weighting-and-depth-schedule.md): Path frequency (weight = Candidates), Rounds drawn from turns 2, 2, 3+, 3+, 3+, no repeated state and no two Rounds sharing a first row; a seeded, deterministic procedure with α kept as a tuning knob.
 - [Round UX and end-of-Run breakdown](0014-round-ux.md): one Round at a time on a Wordle board with an on-screen keyboard, no Candidate list or count, Enter twice to lock in, only progress pips during the Run, and an end-of-Run stack of Round cards (cost bar, optimal and Also-optimal Guesses, top-5 alternatives, Open in Visualiser); mobile and accessibility follow the Visualiser's baseline.
 - [Sub-site structure](0015-sub-site-structure.md): a Vite multi-page build, with the Visualiser at `/` (still the home page) and the trainer at `/ranked/`, each owning its own hash; a shared header ("Optimal Wordle", sub-site nav) and footer; the trainer's pure logic in `packages/core` and shared UI in `site/src/shared/`; "Open in Visualiser" opens `../#<state hash>?whatif=<guess>` in a new tab; no per-state "Practise this".
+- [Scoring formula](0016-scoring-formula.md): 100 × max(0, 1 − extra/0.5) per Round on the absolute extra Expected guesses, 500 per Run, equal Rounds, no bonuses; tiers from points (Optimal 100, Excellent ≥90, Good ≥70, OK ≥40, Miss) with 🟩/🟨/⬛ squares.
 
 ## Not yet specified
 
