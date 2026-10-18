@@ -4,16 +4,15 @@ main.rk { max-width: 760px; }
 
 /* ---------- a Round ---------- */
 .rk-round { max-width: 520px; margin: 0 auto; display: flex; flex-direction: column; align-items: center; gap: 12px; }
-.pips { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; justify-content: center; }
+.progress { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.pips { display: flex; gap: 6px; }
 .pips i { width: 28px; height: 6px; border-radius: 3px; background: var(--tile-empty); }
-.pips i.done { background: var(--fg); }
-.pips i.cur { background: var(--accent); }
-.rk-prompt { margin: 0; }
+.pips i.on { background: var(--fg); }
+.rk-prompt { margin: 0; font-size: 16px; }
 .rk-board { display: flex; flex-direction: column; gap: 5px; --tile: 56px; }
 .rk-board .tiles { gap: 5px; }
 .rk-board .t.lg { width: min(var(--tile), 14vw); height: min(var(--tile), 14vw); }
 .rk-board .typed .t.N { border-color: var(--mute); }
-.rk-board .typed.confirm .t { border-color: var(--accent); }
 .rk-board .future .t.N { border-style: dashed; border-color: var(--line); }
 .rk-msg { min-height: 22px; font-weight: 600; text-align: center; }
 .shake { animation: shake 0.35s; }
@@ -23,7 +22,7 @@ main.rk { max-width: 760px; }
 .kb { width: 100%; display: flex; flex-direction: column; gap: 6px; user-select: none; }
 .kb div { display: flex; gap: 5px; justify-content: center; }
 .kb button {
-  flex: 1; max-width: 44px; height: 54px; border: 0; border-radius: 4px; background: var(--tile-empty); color: var(--fg);
+  flex: 1; max-width: 44px; height: 54px; border: 0; border-radius: 4px; background: var(--key); color: var(--fg);
   font-weight: 700; text-transform: uppercase; font-size: 14px; padding: 0; cursor: pointer;
 }
 .kb button.wide { max-width: 68px; flex: 1.5; font-size: 11px; }
@@ -32,23 +31,45 @@ main.rk { max-width: 760px; }
 .kb button.B { background: var(--B); color: var(--tile-fg); }
 
 /* ---------- the breakdown ---------- */
+main.rk.wide { max-width: 1400px; }
 .rk-total { text-align: center; margin: 8px 0 18px; display: flex; flex-direction: column; align-items: center; gap: 6px; }
-.rk-total b { font-size: 40px; line-height: 1.1; }
+.rk-total b { font-size: 40px; line-height: 1.1; font-variant-numeric: tabular-nums; }
 .rk-total .squares { font-size: 22px; letter-spacing: 2px; }
-.rk-actions { display: flex; gap: 8px; margin: 4px 0; }
-.rcard { display: grid; grid-template-columns: auto 1fr; gap: 16px; margin-bottom: 14px; }
-.rcard .mini { display: flex; flex-direction: column; gap: 3px; }
-.rcard h3 { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; margin-bottom: 6px; }
-.rcard .pts { margin-left: auto; font-size: 20px; }
+.rk-actions { display: flex; gap: 8px; margin: 4px 0; align-items: center; }
+
+/* Round cards: side by side on a laptop, wrapping on tablets, stacked on phones. */
+.rk-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+@media (min-width: 1100px) { .rk-cards { grid-template-columns: repeat(5, minmax(0, 1fr)); } }
+.rcard { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.rcard h3 { display: flex; gap: 8px; align-items: center; margin: 0; }
+.rcard .pts { margin-left: auto; font-size: 20px; font-variant-numeric: tabular-nums; }
+.rcard .mini { display: flex; flex-direction: column; gap: 3px; margin: 2px 0 4px; }
+.rcard .mini .pad { visibility: hidden; }
 .costbar {
-  position: relative; height: 8px; border-radius: 4px; margin: 10px 0 6px;
+  position: relative; height: 8px; border-radius: 4px; margin: 6px 0 4px;
   background: linear-gradient(90deg, var(--G), var(--Y) 40%, var(--tile-empty) 100%);
 }
 .costbar span { position: absolute; top: -5px; width: 3px; height: 18px; background: var(--fg); border-radius: 2px; transform: translateX(-1px); }
-.rk-alts { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 8px; }
-.rk-alts td { padding: 3px 6px; border-top: 1px solid var(--line-soft); }
+.rk-alts { width: 100%; border-collapse: collapse; font-size: 11px; }
+.rk-alts td { padding: 3px 2px; border-top: 1px solid var(--line-soft); }
 .rk-alts td.w { text-transform: uppercase; font-weight: 600; letter-spacing: 0.05em; white-space: nowrap; }
-.rk-alts td.n { text-align: right; font-variant-numeric: tabular-nums; }
+.rk-alts td.marks { font-size: 9px; white-space: nowrap; }
+.rk-alts td.marks .tag { font-size: 9px; margin-left: 0; padding: 0 3px; }
+.rk-alts td.n { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .rk-alts tr.you td { background: var(--sel); }
-.rk-link { display: inline-block; margin-top: 10px; }
-@media (max-width: 560px) { .rcard { grid-template-columns: 1fr; } }
+
+/* Icon buttons, with their label shown on hover or keyboard focus. */
+.icon {
+  display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; padding: 0;
+  border: 1px solid var(--line); border-radius: 6px; background: var(--card); color: var(--fg); cursor: pointer;
+}
+.rcard .icon { width: 28px; height: 28px; color: var(--accent); }
+.icon:hover { background: var(--hover); }
+.tip { position: relative; }
+.tip::after {
+  content: attr(data-tip); position: absolute; bottom: calc(100% + 6px); left: 50%; transform: translateX(-50%);
+  background: var(--fg); color: var(--bg); font-size: 11px; font-weight: 600; white-space: nowrap;
+  padding: 3px 7px; border-radius: 4px; pointer-events: none; opacity: 0; transition: opacity 0.1s; z-index: 10;
+}
+.tip:hover::after, .tip:focus-visible::after { opacity: 1; }
+.rcard .tip::after { left: 0; transform: none; }

@@ -14,6 +14,8 @@
   --B: #787c7e;
   --tile-empty: #d3d6da;
   --tile-fg: #fff;
+  /* An unused key; a letter known to be absent takes --B, as on Wordle's keyboard. */
+  --key: #d3d6da;
   --accent: #3b6fd8;
   --accent-fg: #fff;
   --alt: #e08a1e;
@@ -45,6 +47,7 @@
     --Y: #b59f3b;
     --B: #3a3a3c;
     --tile-empty: #3a3a3c;
+    --key: #818384;
     --accent: #6d98ef;
     --accent-fg: #0b1220;
     --alt: #f0a04a;
@@ -123,10 +126,16 @@ header.site nav a[aria-current='page'] { color: var(--fg); background: var(--lin
 .suggest li { padding: 6px 10px; border-radius: 4px; cursor: pointer; text-transform: uppercase; letter-spacing: 0.1em; font-weight: 600; }
 .suggest li[aria-selected='true'], .suggest li:hover { background: var(--sel); }
 
-main { padding: 16px; max-width: 1400px; margin: 0 auto; }
+/* Header, main and footer fill the window, so the footer sits at the bottom. */
+#root { min-height: 100vh; display: flex; flex-direction: column; }
+main { padding: 16px; max-width: 1400px; margin: 0 auto; width: 100%; flex: 1 0 auto; }
 .intro { margin: 0 0 12px; }
 .banner { background: var(--path); border-radius: var(--radius); padding: 8px 12px; margin-bottom: 12px; }
-footer { max-width: 1400px; margin: 0 auto; padding: 16px; color: var(--mute); font-size: 12px; border-top: 1px solid var(--line); }
+footer { width: 100%; max-width: 1400px; margin: 0 auto; padding: 16px; color: var(--mute); font-size: 12px; border-top: 1px solid var(--line); }
+/* Too tall for the window: the footer leaves the layout (still measurable) and the header shows a short credit. */
+footer.offscreen { position: absolute; left: 0; right: 0; top: 0; visibility: hidden; }
+header.site .credit { margin-left: auto; font-size: 11px; color: var(--mute); text-decoration: none; white-space: nowrap; }
+header.site .credit:hover { text-decoration: underline; }
 
 .card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 12px; }
 .chip {

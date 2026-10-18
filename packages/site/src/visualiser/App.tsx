@@ -8,7 +8,7 @@ import { Explore } from './explore/Explore';
 import { Stats } from './stats/Stats';
 import { Openers } from './openers/Openers';
 import { fmt, upper } from '../shared/Tiles';
-import { SiteFooter, SiteHeader } from '../shared/Chrome';
+import { SitePage } from '../shared/Chrome';
 
 const DEFAULT_OPENER = 'salet';
 const curated = new Set<string>(CURATED_OPENERS);
@@ -121,33 +121,40 @@ export function App() {
   const n = state.tree.root.size;
   const tabHref = (t: Tab) => formatHash(t, state.node, state.solved);
 
+  // The Visualiser's own bar: its tabs, tagline and Answer search.
+  const bar = (
+    <div className="top">
+      <button
+        className="burger"
+        aria-label="Menu"
+        aria-expanded={menuOpen}
+        aria-controls="sections"
+        onClick={() => setMenuOpen(!menuOpen)}
+      >
+        ☰
+      </button>
+      <span className="tagline">
+        {upper(state.tree.opener)} · {fmt(n)} Answers · {fmt(total)} guesses · avg {(total / n).toFixed(4)}
+      </span>
+      <nav id="sections" className={`topnav ${menuOpen ? 'open' : ''}`} aria-label="Sections">
+        {TABS.map((t) => (
+          <a key={t.id} href={tabHref(t.id)} aria-current={route.tab === t.id ? 'page' : undefined} onClick={() => setMenuOpen(false)}>
+            {t.label}
+          </a>
+        ))}
+      </nav>
+      <Search />
+    </div>
+  );
+
   return (
     <AppContext.Provider value={state}>
-      <SiteHeader page="visualiser" />
-      <div className="top">
-        <button
-          className="burger"
-          aria-label="Menu"
-          aria-expanded={menuOpen}
-          aria-controls="sections"
-          onClick={() => setMenuOpen(!menuOpen)}
-        >
-          ☰
-        </button>
-        <span className="tagline">
-          {upper(state.tree.opener)} · {fmt(n)} Answers · {fmt(total)} guesses · avg {(total / n).toFixed(4)} · tree by
-          Alex Selby (MIT)
-        </span>
-        <nav id="sections" className={`topnav ${menuOpen ? 'open' : ''}`} aria-label="Sections">
-          {TABS.map((t) => (
-            <a key={t.id} href={tabHref(t.id)} aria-current={route.tab === t.id ? 'page' : undefined} onClick={() => setMenuOpen(false)}>
-              {t.label}
-            </a>
-          ))}
-        </nav>
-        <Search />
-      </div>
-      <main>
+      <SitePage
+        page="visualiser"
+        tree={state.tree.file.provenance}
+        footerExtra="Greedy-entropy and the stats are computed by this site."
+        bar={bar}
+      >
         {state.tree.totalMismatch && (
           <div className="banner bad" role="alert">
             {state.tree.totalMismatch}
@@ -156,8 +163,7 @@ export function App() {
         {route.tab === 'explore' && <Explore />}
         {route.tab === 'stats' && <Stats />}
         {route.tab === 'openers' && <Openers />}
-      </main>
-      <SiteFooter tree={state.tree.file.provenance}>Greedy-entropy and the stats are computed by this site.</SiteFooter>
+      </SitePage>
     </AppContext.Provider>
   );
 }

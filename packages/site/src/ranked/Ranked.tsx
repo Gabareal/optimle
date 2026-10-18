@@ -1,7 +1,7 @@
 /** The Ranked trainer page: a Run of five Rounds, then the breakdown. */
 import { useCallback, useEffect, useReducer, useState } from 'react';
 import { RANKED_OPENER } from '@wordle/core';
-import { SiteFooter, SiteHeader } from '../shared/Chrome';
+import { SitePage } from '../shared/Chrome';
 import { loadGuesses, loadTree, type LoadedTree } from '../shared/load';
 import { Breakdown } from './Breakdown';
 import { Round } from './Round';
@@ -73,20 +73,18 @@ export function Ranked() {
   }
 
   return (
-    <>
-      <SiteHeader page="ranked" />
-      <main className="rk">
-        {data?.tree.totalMismatch && (
-          <div className="banner bad" role="alert">
-            {data.tree.totalMismatch}
-          </div>
-        )}
-        {body}
-      </main>
-      <SiteFooter tree={data?.tree.file.provenance}>
-        Each Round is a Game state from the optimal SALET tree, drawn by how often it occurs. Every Guess is scored
-        exactly by Selby's solver.
-      </SiteFooter>
-    </>
+    <SitePage
+      page="ranked"
+      tree={data?.tree.file.provenance}
+      mainClass={`rk ${state && currentRound(state.run) < 0 ? 'wide' : ''}`}
+      footerExtra="Each Round is a Game state from the optimal SALET tree, drawn by how often it occurs. Every Guess is scored exactly by Selby's solver."
+    >
+      {data?.tree.totalMismatch && (
+        <div className="banner bad" role="alert">
+          {data.tree.totalMismatch}
+        </div>
+      )}
+      {body}
+    </SitePage>
   );
 }

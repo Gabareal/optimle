@@ -1,10 +1,10 @@
 /**
  * One Round: the tree's earlier Guesses on a Wordle board, one empty row for the player's
  * Guess, and an on-screen keyboard. No Candidate list or count: the board is the puzzle.
- * Enter on a valid word asks to confirm; Enter again locks it in (see pressKey).
+ * Enter on an allowed Guess locks it in (see pressKey).
  */
 import { useEffect } from 'react';
-import { chain, patternLabel, turnOf, type Colour, type TreeNode } from '@wordle/core';
+import { chain, patternLabel, type Colour, type TreeNode } from '@wordle/core';
 import { Tiles, upper } from '../shared/Tiles';
 import type { Entry } from './run';
 
@@ -41,7 +41,7 @@ export function Round({
   /** Send one key: 'a'–'z', '⏎' or '⌫'. */
   press: (k: string) => void;
 }) {
-  const { typed, confirm, msg, shake } = entry;
+  const { typed, msg, shake } = entry;
 
   useEffect(() => {
     const on = (e: KeyboardEvent) => {
@@ -66,15 +66,17 @@ export function Round({
 
   return (
     <div className="rk-round">
-      <div className="pips" role="img" aria-label={`Round ${index + 1} of ${rounds}`}>
-        {Array.from({ length: rounds }, (_, j) => (
-          <i key={j} className={j < index ? 'done' : j === index ? 'cur' : ''} />
-        ))}
-        <span className="small muted">
-          Round {index + 1} of {rounds} · turn {turnOf(state)}
+      <div className="progress">
+        <span className="small muted" aria-hidden="true">
+          Round {index + 1}/{rounds}
         </span>
+        <div className="pips" role="img" aria-label={`Round ${index + 1} of ${rounds}`}>
+          {Array.from({ length: rounds }, (_, j) => (
+            <i key={j} className={j <= index ? 'on' : ''} />
+          ))}
+        </div>
       </div>
-      <p className="muted small rk-prompt">What is the optimal Guess here?</p>
+      <h2 className="rk-prompt">What is the optimal guess here?</h2>
       <div className="rk-board">
         {rows.slice(0, -1).map((r, i) => {
           const p = rows[i + 1].pattern!;
@@ -86,7 +88,7 @@ export function Round({
         })}
         <div
           key={`typed${shake}`}
-          className={`brow typed ${confirm ? 'confirm' : ''} ${shake ? 'shake' : ''}`}
+          className={`brow typed ${shake ? 'shake' : ''}`}
           role="img"
           aria-label={typed ? `Your Guess so far: ${upper(typed)}` : 'Your Guess: empty'}
         >
@@ -99,7 +101,7 @@ export function Round({
         ))}
       </div>
       <div className="rk-msg" role="status" aria-live="polite">
-        {msg || 'Type a Guess. Scores come at the end of the Run.'}
+        {msg}
       </div>
       <div className="kb" aria-label="Keyboard">
         {KEYS.map((row) => (

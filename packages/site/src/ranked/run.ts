@@ -73,29 +73,26 @@ export function loadScores(n: TreeNode): Promise<ScoresFile> {
 /** What the player has typed in the current Round. */
 export interface Entry {
   typed: string;
-  /** A valid Guess is waiting for the second Enter. */
-  confirm: boolean;
   msg: string;
   /** Bumped on each invalid Enter, to replay the shake. */
   shake: number;
 }
 
-export const EMPTY_ENTRY: Entry = { typed: '', confirm: false, msg: '', shake: 0 };
+export const EMPTY_ENTRY: Entry = { typed: '', msg: '', shake: 0 };
 
 /**
- * One key ('a'–'z', '⏎' or '⌫') against the Run. Locking a Guess moves to the next Round in
- * the same step, so keys pressed straight after land in the new Round.
+ * One key ('a'–'z', '⏎' or '⌫') against the Run. Enter on an allowed Guess locks it in and
+ * moves to the next Round in the same step, so keys pressed straight after land there.
  */
 export function pressKey(run: Run, e: Entry, k: string, guessSet: Set<string>): { run: Run; entry: Entry } {
   const i = currentRound(run);
   if (i < 0) return { run, entry: e };
   let next: Entry = e;
-  if (k === '⌫') next = { ...e, typed: e.typed.slice(0, -1), confirm: false, msg: '' };
+  if (k === '⌫') next = { ...e, typed: e.typed.slice(0, -1), msg: '' };
   else if (k === '⏎') {
-    if (e.confirm) return { run: { ...run, guesses: run.guesses.map((g, j) => (j === i ? e.typed : g)) }, entry: EMPTY_ENTRY };
     if (e.typed.length < 5) next = { ...e, msg: 'Not enough letters', shake: e.shake + 1 };
     else if (!guessSet.has(e.typed)) next = { ...e, msg: `${e.typed.toUpperCase()} is not an allowed Guess`, shake: e.shake + 1 };
-    else next = { ...e, confirm: true, msg: `Lock in ${e.typed.toUpperCase()}? Enter again to confirm · ⌫ to edit` };
-  } else if (/^[a-z]$/.test(k) && !e.confirm && e.typed.length < 5) next = { ...e, typed: e.typed + k, msg: '' };
+    else return { run: { ...run, guesses: run.guesses.map((g, j) => (j === i ? e.typed : g)) }, entry: EMPTY_ENTRY };
+  } else if (/^[a-z]$/.test(k) && e.typed.length < 5) next = { ...e, typed: e.typed + k, msg: '' };
   return { run, entry: next };
 }

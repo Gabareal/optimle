@@ -3,6 +3,12 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <!-- Paint the theme background before the stylesheet and app load, so switching pages doesn't flash white. -->
+    <style>
+      html { background: #fafaf8; }
+      @media (prefers-color-scheme: dark) { html { background: #121213; } }
+    </style>
     <meta name="description" content="The provably optimal Wordle strategy as an explorable decision tree: SALET first, 3.4212 guesses on average." />
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='7' height='7' rx='1' fill='%236aaa64'/%3E%3Crect x='9' width='7' height='7' rx='1' fill='%23c9b458'/%3E%3Crect y='9' width='7' height='7' rx='1' fill='%23787c7e'/%3E%3Crect x='9' y='9' width='7' height='7' rx='1' fill='%236aaa64'/%3E%3C/svg%3E" />
     <title>Optimal Wordle tree</title>
