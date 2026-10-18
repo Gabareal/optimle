@@ -1,0 +1,26 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "site",
+      "runtimeExecutable": "/bin/sh",
+      "runtimeArgs": [
+        "-c",
+        "PATH=\"$HOME/.local/node/bin:$PATH\" pnpm --filter @wordle/site dev --port 5173 --strictPort"
+      ],
+      "port": 5173
+    },
+    {
+      "name": "tree-ux-prototype",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "8765",
+        "--directory",
+        "prototype"
+      ],
+      "port": 8765
+    }
+  ]
+}

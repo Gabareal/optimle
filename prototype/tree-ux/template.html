@@ -1,0 +1,265 @@
+<!doctype html>
+<!--
+  PROTOTYPE — throwaway. Ticket: "Tree exploration UX".
+  Three structurally different ways to explore the optimal Wordle Decision tree,
+  switchable via ?variant=A|B|C (floating bar at the bottom, or ← / → keys).
+  Data: Alex Selby's optimal SALET tree (MIT licence), embedded below.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tree UX Prototype</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+<style>
+  :root { --bg:#fafaf8; --fg:#1a1a1a; --mute:#6b6b6b; --line:#e2e2de; --card:#fff;
+          --G:#6aaa64; --Y:#c9b458; --B:#787c7e; --accent:#3b6fd8; --hl:#ffe08a; }
+  * { box-sizing:border-box; }
+  body { margin:0; font:14px/1.4 system-ui, -apple-system, sans-serif; background:var(--bg); color:var(--fg); }
+  header { display:flex; gap:16px; align-items:center; padding:12px 16px; border-bottom:1px solid var(--line); background:var(--card); flex-wrap:wrap; }
+  header h1 { font-size:16px; margin:0; }
+  header .sub { color:var(--mute); font-size:12px; }
+  .search { margin-left:auto; display:flex; gap:6px; align-items:center; }
+  .search input { font:600 18px/1 system-ui, sans-serif; letter-spacing:.15em; padding:10px 14px; border:2px solid #c9ccd4; border-radius:8px; width:220px; text-transform:uppercase; }
+  .search input:focus { outline:none; border-color:var(--accent); }
+  .search .msg { color:var(--mute); font-size:12px; min-width:120px; }
+  main { padding:16px; padding-bottom:90px; }
+  .tiles { display:inline-flex; gap:2px; }
+  .t { width:22px; height:22px; display:inline-flex; align-items:center; justify-content:center; font-weight:700; font-size:12px; color:#fff; border-radius:3px; text-transform:uppercase; }
+  .t.G{background:var(--G)} .t.Y{background:var(--Y)} .t.B{background:var(--B)} .t.N{background:#fff;color:var(--fg);border:2px solid #d3d6da}
+  .t.sm { width:12px; height:12px; font-size:0; border-radius:2px; }
+  .t.lg { width:52px; height:52px; font-size:26px; border-radius:4px; }
+  .stats { display:flex; gap:14px; flex-wrap:wrap; color:var(--mute); font-size:12px; }
+  .stats b { color:var(--fg); font-size:14px; }
+  .chip { display:inline-block; padding:1px 6px; margin:2px; border:1px solid var(--line); border-radius:10px; font-size:11px; text-transform:uppercase; background:var(--card); cursor:pointer; }
+  .chip.on { background:var(--hl); }
+  .muted { color:var(--mute); }
+  /* switcher */
+  #switcher { position:fixed; left:50%; bottom:16px; transform:translateX(-50%); background:#111; color:#fff; border-radius:999px; padding:6px 8px; display:flex; gap:8px; align-items:center; box-shadow:0 4px 18px rgba(0,0,0,.35); z-index:99; font-size:13px; }
+  #switcher button { background:#333; color:#fff; border:0; border-radius:999px; width:30px; height:30px; cursor:pointer; font-size:15px; }
+  #switcher span { min-width:200px; text-align:center; }
+
+  /* ---------- Variant A: Miller columns ---------- */
+  .cols { display:flex; gap:12px; overflow-x:auto; align-items:flex-start; padding-bottom:8px; }
+  .col { flex:0 0 300px; background:var(--card); border:1px solid var(--line); border-radius:8px; max-height:calc(100vh - 190px); display:flex; flex-direction:column; }
+  .col .head { padding:10px; border-bottom:1px solid var(--line); }
+  .col .head .pat { font-size:11px; color:var(--mute); margin-bottom:6px; display:flex; gap:6px; align-items:center; }
+  .col .list { overflow-y:auto; }
+  .row { display:grid; grid-template-columns:auto 1fr auto; gap:8px; align-items:center; padding:5px 10px; cursor:pointer; border-bottom:1px solid #f1f1ee; }
+  .row:hover { background:#f3f6fd; }
+  .row.sel { background:#e5edfc; }
+  .row.path { box-shadow:inset 3px 0 0 var(--accent); }
+  .bar { height:8px; background:#cfd8ea; border-radius:4px; }
+  .row .nx { font-size:11px; text-transform:uppercase; color:var(--mute); text-align:right; min-width:70px; }
+
+  /* ---------- Variant B: icicle ---------- */
+  .icilay { display:grid; grid-template-columns:1fr 320px; gap:16px; }
+  @media (max-width:900px){ .icilay { grid-template-columns:1fr; } }
+  #ici { background:var(--card); border:1px solid var(--line); border-radius:8px; overflow:hidden; }
+  #ici rect { stroke:#fff; stroke-width:.5; cursor:pointer; }
+  #ici text { font-size:10px; pointer-events:none; fill:#fff; font-weight:600; text-transform:uppercase; }
+  .panel { background:var(--card); border:1px solid var(--line); border-radius:8px; padding:12px; }
+  .crumbs { display:flex; flex-wrap:wrap; gap:4px; align-items:center; margin-bottom:8px; font-size:12px; }
+  .crumbs a { color:var(--accent); cursor:pointer; text-transform:uppercase; }
+  .hist { display:flex; align-items:flex-end; gap:1px; height:70px; margin:8px 0; border-bottom:1px solid var(--line); }
+  .hist div { flex:1; background:#9fb3dc; min-width:1px; }
+
+  /* ---------- Variant C: board walk ---------- */
+  .walk { display:grid; grid-template-columns:auto 1fr; gap:24px; align-items:start; }
+  @media (max-width:900px){ .walk { grid-template-columns:1fr; } }
+  .board { display:flex; flex-direction:column; gap:6px; align-items:center; background:var(--card); padding:16px; border:1px solid var(--line); border-radius:8px; }
+  .board .brow { display:flex; gap:4px; cursor:pointer; position:relative; }
+  .board .brow.cur .t { outline:2px dashed var(--accent); outline-offset:1px; }
+  .board .lbl { font-size:11px; color:var(--mute); }
+  .pick { background:var(--card); border:1px solid var(--line); border-radius:8px; padding:12px; }
+  .pick h3 { margin:0 0 4px; font-size:14px; }
+  .prow { display:grid; grid-template-columns:auto 50px 1fr 80px; gap:8px; align-items:center; padding:3px 4px; cursor:pointer; border-radius:4px; }
+  .prow:hover { background:#f3f6fd; }
+  .prow .cnt { text-align:right; font-variant-numeric:tabular-nums; }
+  .prow .nx { font-size:11px; text-transform:uppercase; color:var(--mute); }
+  .plist { max-height:calc(100vh - 260px); overflow-y:auto; }
+  .walk .left { display:flex; flex-direction:column; gap:12px; width:340px; max-width:100%; }
+  .brow.paint .t { cursor:pointer; user-select:none; transition:transform .08s; }
+  .brow.paint .t:hover { transform:scale(1.06); }
+  .paintbar { display:flex; flex-direction:column; align-items:center; gap:4px; margin-top:4px; text-align:center; }
+  .paintbar .match { font-size:13px; } .paintbar .match.bad { color:#b3452c; }
+  .paintbar button { font:inherit; padding:6px 16px; border:0; border-radius:6px; background:var(--accent); color:#fff; cursor:pointer; }
+  .paintbar button:disabled { background:#c5c9d3; cursor:default; }
+  .bitsq { display:inline-flex; width:16px; height:16px; border-radius:50%; background:#e6e9f0; color:var(--accent); font-size:11px; align-items:center; justify-content:center; cursor:pointer; margin-left:2px; }
+  .explain { font-size:12px; color:var(--fg); background:#f3f6fd; border-radius:6px; padding:8px; margin-top:6px; max-width:300px; }
+  .cands { background:var(--card); border:1px solid var(--line); border-radius:8px; padding:8px 12px; }
+  .cands summary { cursor:pointer; font-weight:600; font-size:13px; }
+  .cands > div { margin-top:6px; max-height:240px; overflow-y:auto; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Optimal Wordle tree</h1>
+  <span class="sub">SALET · 2,315 Answers · 7,920 guesses · avg 3.4212 · tree by Alex Selby (MIT)</span>
+  <div class="search">
+    <input id="q" placeholder="Answer…" maxlength="5" autocomplete="off">
+    <span class="msg" id="qmsg">type an Answer to see its Path</span>
+  </div>
+</header>
+<main id="app"></main>
+<div id="switcher"><button id="prev" title="previous variant">←</button><span id="vlabel"></span><button id="next" title="next variant">→</button></div>
+
+<script>
+const RAW = __TREE__;
+
+// ---------- model ----------
+// node: {guess, pat (edge from parent), parent, kids[], answers[], cost (total guesses from here over its answers), depth}
+function build(raw, parent, pat, depth) {
+  const n = { guess: raw[0], pat, parent, depth, kids: [], answers: [], solvedHere: false };
+  for (const [p, c] of Object.entries(raw[1])) {
+    if (c === 0) { n.solvedHere = true; n.answers.push(n.guess); continue; }
+    const k = build(c, n, p, depth + 1); n.kids.push(k); n.answers.push(...k.answers);
+  }
+  n.kids.sort((a, b) => b.answers.length - a.answers.length);
+  n.cost = (n.solvedHere ? 1 : 0) + n.kids.reduce((s, k) => s + k.answers.length + k.cost, 0);
+  n.size = n.answers.length;
+  n.expected = n.cost / n.size;
+  const groups = n.kids.map(k => k.size).concat(n.solvedHere ? [1] : []);
+  n.groups = groups;
+  n.entropy = -groups.reduce((s, g) => s + (g / n.size) * Math.log2(g / n.size), 0);
+  return n;
+}
+const ROOT = build(RAW, null, null, 0);
+const ANSWERS = new Set(ROOT.answers);
+function pathTo(ans) { const out = [ROOT]; let n = ROOT; while (n.guess !== ans) { n = n.kids.find(k => k.answers.includes(ans)); out.push(n); } return out; }
+function chain(n) { const out = []; while (n) { out.unshift(n); n = n.parent; } return out; }
+
+// ---------- shared bits ----------
+const esc = s => s;
+function tiles(word, pat, cls = '') { return `<span class="tiles">${[...word].map((ch, i) => `<span class="t ${pat ? pat[i] : 'N'} ${cls}">${ch}</span>`).join('')}</span>`; }
+function patTiles(pat) { return `<span class="tiles">${[...pat].map(c => `<span class="t sm ${c}"></span>`).join('')}</span>`; }
+function statsHTML(n) {
+  return `<div class="stats"><span><b>${n.size}</b> candidates</span><span><b>${n.expected.toFixed(3)}</b> exp. guesses</span><span><b>${n.entropy.toFixed(2)}</b> bits</span><span><b>${n.groups.length}</b> groups</span><span>largest <b>${Math.max(...n.groups)}</b></span></div>`;
+}
+function candChips(n, hl, max = 60) {
+  const a = n.answers.slice().sort();
+  return a.slice(0, max).map(w => `<span class="chip ${w === hl ? 'on' : ''}" data-ans="${w}">${w}</span>`).join('') + (a.length > max ? `<span class="muted"> +${a.length - max} more</span>` : '');
+}
+
+let state = { sel: ROOT, path: null, ans: null };   // sel = selected Game state; path = highlighted Answer's Path
+const q = document.getElementById('q'), qmsg = document.getElementById('qmsg');
+q.addEventListener('input', () => {
+  const w = q.value.toLowerCase();
+  if (w.length < 5) { qmsg.textContent = 'type an Answer to see its Path'; return; }
+  if (!ANSWERS.has(w)) { qmsg.textContent = `${w.toUpperCase()} is not an Answer`; return; }
+  const p = pathTo(w); state.path = p; state.ans = w; state.sel = p[p.length - 1];
+  qmsg.textContent = `solved in ${p.length} guess${p.length > 1 ? 'es' : ''}`;
+  render();
+});
+document.addEventListener('click', e => { const c = e.target.closest('[data-ans]'); if (c) { q.value = c.dataset.ans; q.dispatchEvent(new Event('input')); } });
+const onPath = n => state.path && state.path.includes(n);
+
+// ---------- Variant A: Miller columns ----------
+function VariantA(app) {
+  const cols = chain(state.sel);
+  app.innerHTML = `<p class="muted">Columns: each column is a Game state. Its rows are the Feedback patterns its Guess can get, sorted by group size. Click one to open the next column.</p><div class="cols">${cols.map((n, i) => {
+    const max = n.kids.length ? n.kids[0].size : 1, next = cols[i + 1];
+    return `<div class="col"><div class="head">${n.pat ? `<div class="pat">after ${patTiles(n.pat)}</div>` : '<div class="pat">opening Guess</div>'}
+      <div style="margin-bottom:6px">${tiles(n.guess)}</div>${statsHTML(n)}</div>
+      <div class="list">${n.solvedHere ? `<div class="row ${state.ans === n.guess ? 'path' : ''}">${patTiles('GGGGG')}<div class="muted" style="font-size:12px">solved: ${n.guess.toUpperCase()}</div><div class="nx">1</div></div>` : ''}
+      ${n.kids.map((k, j) => `<div class="row ${k === next ? 'sel' : ''} ${onPath(k) ? 'path' : ''}" data-a="${i}:${j}">${patTiles(k.pat)}<div class="bar" style="width:${Math.max(4, 100 * k.size / max)}%"></div><div class="nx">${k.size} → ${k.guess}</div></div>`).join('')}</div></div>`;
+  }).join('')}
+  <div class="col" style="flex-basis:260px"><div class="head"><b>Candidates here</b></div><div style="padding:8px">${candChips(state.sel, state.ans, 200)}</div></div></div>`;
+  app.querySelectorAll('[data-a]').forEach(el => el.onclick = () => { const [i, j] = el.dataset.a.split(':').map(Number); state.sel = cols[i].kids[j]; render(); });
+  const c = app.querySelector('.cols'); c.scrollLeft = c.scrollWidth;
+}
+
+// ---------- Variant B: zoomable icicle ----------
+function VariantB(app) {
+  app.innerHTML = `<p class="muted">Icicle: the whole tree at once. Depth runs left → right, and each block's height is how many Answers pass through it. Click a block to zoom in; click the left-most block to zoom out.</p>
+  <div class="icilay"><div id="ici"></div><div class="panel" id="side"></div></div>`;
+  const W = Math.min(document.getElementById('ici').clientWidth || 900, 1400), H = Math.max(520, window.innerHeight - 220);
+  const hroot = d3.hierarchy(ROOT, n => n.kids).sum(n => n.solvedHere ? 1 : 0).sort((a, b) => b.value - a.value);
+  d3.partition().size([H, 6])(hroot);
+  const color = d3.scaleSequential([1, 3.5], d3.interpolateYlGnBu);
+  const svg = d3.select('#ici').append('svg').attr('width', W).attr('height', H);
+  const focus = hroot.descendants().find(d => d.data === state.sel) || hroot;
+  const x0 = focus.y0, ky = H / (focus.x1 - focus.x0), colW = W / Math.min(6 - focus.depth, 5);
+  const vis = hroot.descendants().filter(d => d.x1 > focus.x0 && d.x0 < focus.x1 && d.depth >= Math.max(0, focus.depth - 1));
+  const g = svg.selectAll('g').data(vis).join('g')
+    .attr('transform', d => `translate(${(d.depth - focus.depth + (focus.depth ? 1 : 0)) * colW * 0.85},${(d.x0 - focus.x0) * ky})`);
+  g.append('rect').attr('width', colW * 0.85).attr('height', d => Math.max(0.5, (d.x1 - d.x0) * ky))
+    .attr('fill', d => onPath(d.data) ? '#e08a1e' : d === focus ? '#3b6fd8' : color(d.data.expected))
+    .on('click', (e, d) => { state.sel = d === focus && d.parent ? d.parent.data : d.data; render(); })
+    .append('title').text(d => `${d.data.pat ? d.data.pat + ' → ' : ''}${d.data.guess.toUpperCase()} · ${d.data.size} candidates · ${d.data.expected.toFixed(2)} exp.`);
+  g.filter(d => (d.x1 - d.x0) * ky > 13).append('text').attr('x', 4).attr('y', 12)
+    .style('fill', d => d.data.expected < 2 ? '#123' : '#fff').text(d => `${d.data.guess} · ${d.data.size}`);
+  const n = state.sel, bins = n.groups.slice().sort((a, b) => b - a), mx = bins[0];
+  document.getElementById('side').innerHTML = `<div class="crumbs">${chain(n).map((c, i) => `${i ? patTiles(c.pat) : ''}<a data-c="${i}">${c.guess}</a>`).join(' ')}</div>
+    ${tiles(n.guess)}<div style="height:8px"></div>${statsHTML(n)}
+    <div class="muted" style="margin-top:10px;font-size:12px">Group sizes after ${n.guess.toUpperCase()} (largest → smallest)</div>
+    <div class="hist">${bins.map(b => `<div style="height:${100 * b / mx}%" title="${b}"></div>`).join('')}</div>
+    <div class="muted" style="font-size:12px">Candidates</div>${candChips(n, state.ans, 80)}`;
+  document.querySelectorAll('[data-c]').forEach(a => a.onclick = () => { state.sel = chain(n)[+a.dataset.c]; render(); });
+}
+
+// ---------- Variant C: board walk ----------
+// draft = the feedback the visitor is painting onto the current row's tiles (click a tile: grey → yellow → green)
+let draft = { node: null, pat: 'BBBBB' }, candOpen = null;
+const CYCLE = { B: 'Y', Y: 'G', G: 'B' };
+function VariantC(app) {
+  const ch = chain(state.sel), n = state.sel;
+  if (draft.node !== n) draft = { node: n, pat: 'BBBBB' };
+  const solved = state.ans === n.guess && n.solvedHere;
+  const rows = ch.map((c, i) => {
+    const last = i === ch.length - 1, nxt = ch[i + 1];
+    if (!last) return `<div class="brow" data-r="${i}" title="rewind to here">${tiles(c.guess, nxt.pat, 'lg')}</div>`;
+    if (solved) return `<div class="brow">${tiles(c.guess, 'GGGGG', 'lg')}</div>`;
+    return `<div class="brow cur paint">${[...c.guess].map((l, j) => `<span class="t lg ${draft.pat[j]}" data-tile="${j}" title="click to change colour">${l}</span>`).join('')}</div>`;
+  }).join('');
+  const empty = Array.from({ length: Math.max(0, 6 - ch.length) }, () => `<div class="brow">${tiles('     ', null, 'lg')}</div>`).join('');
+  const match = draft.pat === 'GGGGG' ? (n.solvedHere ? 'solved' : null) : n.kids.find(k => k.pat === draft.pat);
+  const matchMsg = solved ? `Solved in ${ch.length}!`
+    : match === 'solved' ? `<b>${n.guess.toUpperCase()}</b> is the Answer` : match ? `<b>${match.size}</b> candidate${match.size > 1 ? 's' : ''} give this feedback`
+    : `No remaining candidate gives this feedback`;
+  const max = n.kids.length ? n.kids[0].size : 1;
+  if (candOpen === null || candOpen.node !== n) candOpen = { node: n, open: n.size < 10 };
+  app.innerHTML = `<p class="muted">Click a row to rewind.</p>
+  <div class="walk"><div class="left">
+    <div class="board">${rows}${empty}
+      ${solved ? '' : `<div class="paintbar"><span class="muted" style="font-size:12px">Click the letters to colour in your feedback</span>
+        <span class="match ${match ? '' : 'bad'}">${matchMsg}</span><button id="apply" ${match ? '' : 'disabled'}>Go →</button></div>`}
+      <div class="lbl">${statsC(n)}</div></div>
+    <details class="cands" ${candOpen.open ? 'open' : ''}><summary>Candidates (${n.size})</summary><div>${candChips(n, state.ans, 400)}</div></details>
+  </div>
+  <div class="pick"><h3>Tree plays ${n.guess.toUpperCase()}</h3>
+    <div class="muted" style="font-size:12px;margin-bottom:8px">${n.size} candidates split into ${n.groups.length} groups · largest ${Math.max(...n.groups)}</div>
+    <div class="plist">${n.solvedHere ? `<div class="prow" data-solve>${patTiles('GGGGG')}<span class="cnt">1</span><span class="muted">solved!</span><span></span></div>` : ''}
+    ${n.kids.map((k, j) => `<div class="prow" data-k="${j}" style="${onPath(k) ? 'background:#fff3d6' : k.pat === draft.pat ? 'background:#e5edfc' : ''}">${patTiles(k.pat)}<span class="cnt">${k.size}</span><div class="bar" style="width:${Math.max(3, 100 * k.size / max)}%"></div><span class="nx">then ${k.guess}</span></div>`).join('')}</div>
+  </div></div>`;
+  const goto = k => { state.sel = k; render(); };
+  app.querySelectorAll('[data-k]').forEach(el => el.onclick = () => goto(n.kids[+el.dataset.k]));
+  app.querySelectorAll('[data-r]').forEach(el => el.onclick = () => goto(ch[+el.dataset.r]));
+  app.querySelectorAll('[data-tile]').forEach(el => el.onclick = () => { const j = +el.dataset.tile; draft.pat = draft.pat.slice(0, j) + CYCLE[draft.pat[j]] + draft.pat.slice(j + 1); render(); });
+  const solve = () => { state.ans = n.guess; state.path = ch; q.value = n.guess; qmsg.textContent = `solved in ${ch.length}`; render(); };
+  const sv = app.querySelector('[data-solve]'); if (sv) sv.onclick = solve;
+  const ap = app.querySelector('#apply'); if (ap) ap.onclick = () => match === 'solved' ? solve() : goto(match);
+  app.querySelector('.cands').ontoggle = e => { candOpen.open = e.target.open; };
+  const bi = app.querySelector('.bitsq'); if (bi) bi.onclick = () => { bitsOpen = !bitsOpen; render(); };
+}
+let bitsOpen = false;
+function statsC(n) {
+  return `<div class="stats"><span><b>${n.size}</b> candidates</span><span><b>${n.expected.toFixed(3)}</b> exp. guesses</span>
+    <span><b>${n.entropy.toFixed(2)}</b> bits <a class="bitsq" title="what are bits?">?</a></span></div>
+    ${bitsOpen ? `<div class="explain">Bits measure how much a Guess narrows things down. Each bit halves the candidates on average, so ${n.entropy.toFixed(2)} bits cuts ${n.size} candidates to about <b>${Math.max(1, n.size / 2 ** n.entropy).toFixed(1)}</b>. Expected guesses is what the tree actually minimises: the average number of guesses still needed from here.</div>` : ''}`;
+}
+
+// ---------- switcher ----------
+const VARIANTS = { A: ['Miller columns', VariantA], B: ['Zoomable icicle', VariantB], C: ['Board walk', VariantC] };
+const keys = Object.keys(VARIANTS);
+function cur() { const v = new URLSearchParams(location.search).get('variant'); return keys.includes(v) ? v : 'C'; }
+function go(d) { const i = (keys.indexOf(cur()) + d + keys.length) % keys.length; const u = new URL(location); u.searchParams.set('variant', keys[i]); history.replaceState(null, '', u); render(); }
+function render() { const v = cur(); document.getElementById('vlabel').textContent = `${v} (${VARIANTS[v][0]})`; VARIANTS[v][1](document.getElementById('app')); }
+document.getElementById('prev').onclick = () => go(-1);
+document.getElementById('next').onclick = () => go(1);
+document.addEventListener('keydown', e => { if (e.target.closest('input,textarea,[contenteditable]')) return; if (e.key === 'ArrowLeft') go(-1); if (e.key === 'ArrowRight') go(1); });
+window.addEventListener('resize', () => cur() === 'B' && render());
+render();
+</script>
+</body>
+</html>

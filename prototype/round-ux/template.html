@@ -1,0 +1,399 @@
+<!doctype html>
+<!--
+  PROTOTYPE — throwaway. Ticket: "Round UX and end-of-Run breakdown" (issues/0014-round-ux.md).
+  Three structurally different Ranked trainer Runs, switchable via ?variant=A|B|C
+  (floating bar at the bottom, or ← / → when no text box is focused).
+  ?cands=none|count|list overrides each variant's default Candidate display. ?seed=… fixes the Run.
+  Data: real SALET Eligible Game states (Alex Selby, MIT licence). Built by build.py.
+  Scores: exact for the solver's top-10 Guesses per state; any other Guess gets a group-size
+  ESTIMATE (marked ≈). Points are a PLACEHOLDER: 100 × max(0, 1 − extra / 0.5).
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PROTOTYPE · Round UX</title>
+<style>
+  :root { --bg:#fafaf8; --fg:#1a1a1a; --mute:#6b6b6b; --line:#e2e2de; --card:#fff;
+          --G:#6aaa64; --Y:#c9b458; --B:#787c7e; --key:#d3d6da; --accent:#3b6fd8; --bad:#c0392b; --hl:#ffe08a;
+          --font:system-ui,-apple-system,'Segoe UI',sans-serif; }
+  * { box-sizing:border-box; }
+  body { margin:0; font:14px/1.4 var(--font); background:var(--bg); color:var(--fg); }
+  header.top { display:flex; gap:12px; align-items:center; padding:10px 16px; border-bottom:1px solid var(--line); background:var(--card); flex-wrap:wrap; }
+  header.top h1 { font-size:16px; margin:0; white-space:nowrap; }
+  header.top nav a { color:var(--mute); text-decoration:none; font-weight:600; padding:6px 10px; border-radius:6px; }
+  header.top nav a.on { color:var(--fg); background:#eef0f4; }
+  main { max-width:1100px; margin:0 auto; padding:16px; padding-bottom:110px; }
+  button { font:inherit; color:inherit; cursor:pointer; }
+  .btn { border:1px solid var(--line); background:var(--card); border-radius:8px; padding:8px 14px; font-weight:600; }
+  .btn.primary { background:var(--accent); border-color:var(--accent); color:#fff; }
+  .btn:disabled { opacity:.45; cursor:default; }
+  .muted { color:var(--mute); } .small { font-size:12px; }
+  a { color:var(--accent); }
+  :focus-visible { outline:3px solid var(--accent); outline-offset:2px; }
+  .sr { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); }
+
+  .tiles { display:inline-flex; gap:3px; }
+  .t { width:var(--ts,22px); height:var(--ts,22px); display:inline-flex; align-items:center; justify-content:center; font-weight:700;
+       font-size:calc(var(--ts,22px) * .5); color:#fff; border-radius:3px; text-transform:uppercase; }
+  .t.G{background:var(--G)} .t.Y{background:var(--Y)} .t.B{background:var(--B)}
+  .t.N{background:var(--card);color:var(--fg);border:2px solid #878a8c}
+  .t.E{background:var(--card);border:2px solid #d3d6da}
+  .t.F{background:var(--card);border:2px dashed #e6e6e3}
+  .cand { display:inline-block; padding:1px 6px; margin:2px; border:1px solid var(--line); border-radius:10px; font-size:11px; text-transform:uppercase; background:var(--card); }
+  .pill { display:inline-block; padding:2px 8px; border-radius:999px; font-size:12px; font-weight:600; background:#eef0f4; }
+  .pill.opt { background:#dff0dc; color:#2f6b2a; } .pill.est { background:#fff4cc; color:#7a5d00; }
+  .shake { animation:shake .35s; } @keyframes shake { 20%,60%{transform:translateX(-6px)} 40%,80%{transform:translateX(6px)} }
+
+  /* switcher */
+  #switcher { position:fixed; left:50%; bottom:16px; transform:translateX(-50%); background:#111; color:#fff; border-radius:999px; padding:6px 8px; display:flex; gap:8px; align-items:center; box-shadow:0 4px 18px rgba(0,0,0,.35); z-index:99; font-size:13px; white-space:nowrap; }
+  #switcher button { background:#333; color:#fff; border:0; border-radius:999px; min-width:30px; height:30px; padding:0 10px; font-size:13px; }
+  #switcher #vlabel { min-width:170px; text-align:center; }
+  @media (max-width:560px) { #switcher { font-size:11px; gap:4px; } #switcher #vlabel { min-width:0; } #switcher .vn { display:none; } }
+  #proto { margin-top:40px; font-size:12px; color:var(--mute); }
+  #proto pre { white-space:pre-wrap; background:#f1f1ee; padding:8px; border-radius:6px; }
+
+  /* ---------- A: Wordle board + keyboard ---------- */
+  .A { max-width:520px; margin:0 auto; display:flex; flex-direction:column; align-items:center; gap:12px; }
+  .pips { display:flex; gap:6px; align-items:center; }
+  .pips i { width:28px; height:6px; border-radius:3px; background:#d3d6da; }
+  .pips i.done { background:var(--fg); } .pips i.cur { background:var(--accent); }
+  .A .board { display:flex; flex-direction:column; gap:5px; --ts:min(56px,14vw); }
+  .A .board .tiles { gap:5px; }
+  .A .board .confirm .t { border-color:var(--accent); }
+  .A .msg { min-height:22px; font-weight:600; text-align:center; }
+  .kb { width:100%; display:flex; flex-direction:column; gap:6px; user-select:none; }
+  .kb div { display:flex; gap:5px; justify-content:center; }
+  .kb button { flex:1; max-width:44px; height:54px; border:0; border-radius:4px; background:var(--key); font-weight:700; text-transform:uppercase; font-size:14px; padding:0; }
+  .kb button.wide { max-width:68px; flex:1.5; font-size:11px; }
+  .kb button.G{background:var(--G);color:#fff} .kb button.Y{background:var(--Y);color:#fff} .kb button.B{background:var(--B);color:#fff}
+  .Abd { max-width:720px; margin:0 auto; }
+  .Abd .total { text-align:center; margin:8px 0 18px; }
+  .Abd .total b { font-size:40px; display:block; }
+  .rcard { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:14px; margin-bottom:14px; display:grid; grid-template-columns:auto 1fr; gap:16px; }
+  @media (max-width:560px) { .rcard { grid-template-columns:1fr; } }
+  .rcard .mini { display:flex; flex-direction:column; gap:3px; --ts:20px; }
+  .rcard h3 { margin:0 0 6px; font-size:14px; display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+  .rcard .pts { margin-left:auto; font-size:20px; }
+  .costbar { position:relative; height:8px; background:linear-gradient(90deg,var(--G),var(--Y) 40%,#d3d6da 100%); border-radius:4px; margin:8px 0 2px; }
+  .costbar span { position:absolute; top:-5px; width:3px; height:18px; background:var(--fg); border-radius:2px; transform:translateX(-1px); }
+  .alts { width:100%; border-collapse:collapse; font-size:12px; margin-top:6px; }
+  .alts td { padding:2px 6px; border-top:1px solid #f1f1ee; } .alts td.w { text-transform:uppercase; font-weight:600; letter-spacing:.05em; }
+  .alts tr.you td { background:#e5edfc; } .alts td.n { text-align:right; font-variant-numeric:tabular-nums; }
+
+  /* ---------- B: worksheet ---------- */
+  .B .bar { display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin-bottom:12px; }
+  .sheet { display:flex; flex-direction:column; gap:10px; }
+  .srow { background:var(--card); border:1px solid var(--line); border-radius:8px; padding:12px; display:grid; grid-template-columns:36px auto 1fr 220px; gap:14px; align-items:start; }
+  @media (max-width:820px) { .srow { grid-template-columns:36px 1fr; } .srow .cl, .srow .inp { grid-column:1 / -1; } }
+  .srow .num { font-size:22px; font-weight:800; color:var(--mute); }
+  .srow .mini { display:flex; flex-direction:column; gap:3px; --ts:24px; }
+  .srow .cl { max-height:120px; overflow:auto; }
+  .srow input { width:100%; font:700 20px/1 var(--font); letter-spacing:.2em; text-transform:uppercase; padding:10px; border:2px solid #c9ccd4; border-radius:8px; }
+  .srow input.ok { border-color:var(--G); } .srow input.no { border-color:var(--bad); }
+  .srow .v { font-size:12px; min-height:16px; margin-top:4px; }
+  table.bd { width:100%; border-collapse:collapse; background:var(--card); border:1px solid var(--line); border-radius:8px; overflow:hidden; }
+  table.bd th, table.bd td { text-align:left; padding:8px 10px; border-bottom:1px solid var(--line); vertical-align:middle; }
+  table.bd th { font-size:12px; color:var(--mute); font-weight:600; }
+  table.bd td.w { text-transform:uppercase; font-weight:700; letter-spacing:.06em; }
+  table.bd td.n { text-align:right; font-variant-numeric:tabular-nums; }
+  table.bd tr.main { cursor:pointer; } table.bd tr.main:hover { background:#f3f6fd; }
+  table.bd tr.det td { background:#fafbfd; }
+  table.bd .mini { display:flex; flex-direction:column; gap:2px; --ts:12px; }
+  table.bd .mini .t { font-size:0; }
+  @media (max-width:640px) { table.bd .hide-s { display:none; } }
+  .nl { position:relative; height:46px; margin:10px 8px 4px; border-bottom:2px solid var(--line); }
+  .nl .tk { position:absolute; bottom:0; width:2px; height:12px; background:#9fb3dc; }
+  .nl .you { position:absolute; bottom:0; transform:translateX(-50%); text-align:center; font-size:11px; font-weight:700; }
+  .nl .you::after { content:''; display:block; width:3px; height:24px; background:var(--fg); margin:2px auto 0; }
+  .nl .ax { position:absolute; bottom:-18px; font-size:10px; color:var(--mute); transform:translateX(-50%); }
+
+  /* ---------- C: focus + staged reveal ---------- */
+  .C { max-width:460px; margin:4vh auto 0; text-align:center; }
+  .C .prog { height:4px; background:#e6e6e3; border-radius:2px; overflow:hidden; margin-bottom:6px; }
+  .C .prog div { height:100%; background:var(--fg); transition:width .3s; }
+  .C .board { display:inline-flex; flex-direction:column; gap:6px; --ts:min(48px,13vw); margin:24px 0; }
+  .C .board .tiles { gap:5px; }
+  .C h2 { font-size:22px; margin:0 0 6px; }
+  .C input { width:100%; font:800 32px/1 var(--font); letter-spacing:.35em; text-align:center; text-transform:uppercase; padding:14px; border:0; border-bottom:3px solid var(--fg); background:transparent; }
+  .C input:focus { outline:none; border-color:var(--accent); }
+  .C .v { min-height:20px; margin:8px 0 14px; font-weight:600; }
+  .C .confirm { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:16px; box-shadow:0 6px 24px rgba(0,0,0,.08); }
+  .flip { animation:flip .5s ease-out; } @keyframes flip { from { transform:rotateX(90deg); opacity:0 } to { transform:none; opacity:1 } }
+  .C .rv { text-align:left; background:var(--card); border:1px solid var(--line); border-radius:12px; padding:14px; margin:10px 0; }
+  .C .rv .head { display:flex; align-items:center; gap:8px; }
+  .C .rv .big { margin-left:auto; font-size:26px; font-weight:800; }
+  .C .running { font-size:56px; font-weight:800; line-height:1; margin:12px 0 0; font-variant-numeric:tabular-nums; }
+  .C .grid { font-size:28px; letter-spacing:4px; margin:10px 0; }
+  .C .rv .mini { display:flex; flex-direction:column; gap:2px; --ts:16px; margin:8px 0; }
+</style>
+</head>
+<body>
+<header class="top">
+  <h1>Optimal Wordle tree</h1>
+  <nav><a href="#">Visualiser</a><a href="#" class="on" aria-current="page">Ranked trainer</a></nav>
+</header>
+<main id="app"></main>
+<div id="switcher" aria-label="Prototype controls">
+  <button id="prev" title="previous variant">←</button><span id="vlabel"></span><button id="next" title="next variant">→</button>
+  <button id="candsBtn" title="cycle Candidate display"></button><button id="newBtn" title="new Run">New Run</button>
+</div>
+<script>
+const STATES = /*STATES*/null;
+const WORDS = new Set((/*GUESSES*/null).split(' '));
+const VIS = 'http://localhost:5173/'; // the Visualiser dev server
+
+/* ---------- Shared prototype logic ---------- */
+function fb(g, a) {
+  const r = Array(5).fill('B'), rem = [...a];
+  for (let i = 0; i < 5; i++) if (g[i] === a[i]) { r[i] = 'G'; rem[i] = null; }
+  for (let i = 0; i < 5; i++) if (r[i] === 'B') { const j = rem.indexOf(g[i]); if (j >= 0) { r[i] = 'Y'; rem[j] = null; } }
+  return r.join('');
+}
+function rng(seed) {
+  let h = 1779033703 ^ String(seed).length;
+  for (const c of String(seed)) { h = Math.imul(h ^ c.charCodeAt(0), 3432918353); h = (h << 13) | (h >>> 19); }
+  let a = h >>> 0;
+  return () => { a |= 0; a = (a + 0x6d2b79f5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+}
+// The procedure from the draw-weighting ticket: turns 2,2,3+,3+,3+; Path frequency; no repeated state or first row.
+function drawRun(seed) {
+  const rand = rng(seed), used = new Set(), usedTop = new Set(), rounds = [];
+  for (const turns of [[2], [2], [3, 4], [3, 4], [3, 4]]) {
+    let pool = STATES.filter(s => turns.includes(s.turn) && !used.has(s.key));
+    const strict = pool.filter(s => !usedTop.has(s.top)); if (strict.length) pool = strict;
+    let x = rand() * pool.reduce((t, s) => t + s.cands.length, 0), state = pool[pool.length - 1];
+    for (const s of pool) { x -= s.cands.length; if (x <= 0) { state = s; break; } }
+    used.add(state.key); usedTop.add(state.top);
+    rounds.push({ state, guess: null });
+  }
+  return { seed, rounds };
+}
+// Exact if the solver's top 10 has it, else a group-size estimate (prototype only; the real data is exact).
+function score(state, g) {
+  const n = state.cands.length, opt = Math.min(...state.alts.map(a => a[1]));
+  const hit = state.alts.find(a => a[0] === g);
+  let total, exact = !!hit;
+  if (hit) total = hit[1];
+  else {
+    const groups = {};
+    for (const a of state.cands) { const p = fb(g, a); groups[p] = (groups[p] || 0) + 1; }
+    total = 0;
+    for (const [p, k] of Object.entries(groups)) total += p === 'GGGGG' ? 1 : k === 1 ? 2 : 3 * k - 1;
+    total = Math.min(Math.max(total, Math.max(...state.alts.map(a => a[1]))), opt + n);
+  }
+  const extra = (total - opt) / n;
+  const points = Math.round(100 * Math.max(0, 1 - extra / 0.5)); // PLACEHOLDER formula
+  const tier = extra === 0 ? 'Optimal' : extra <= 0.05 ? 'Excellent' : extra <= 0.15 ? 'Good' : extra <= 0.3 ? 'OK' : 'Miss';
+  return { total, opt, extra, exact, points, tier, isCand: state.cands.includes(g), treeChoice: g === state.guess };
+}
+const optimalSet = s => { const o = Math.min(...s.alts.map(a => a[1])); return s.alts.filter(a => a[1] === o).map(a => a[0]); };
+const visLink = s => VIS + '#' + s.rows.map(([g, p]) => g + '.' + p).join('.') + '.' + s.guess;
+const pathFreq = s => (100 * s.cands.length / 2315).toFixed(1) + '%';
+const fmt = x => (x === 0 ? '±0' : '+' + x.toFixed(2));
+const emoji = sc => sc.extra === 0 ? '🟩' : sc.points >= 50 ? '🟨' : '⬛';
+const COLOR = { G: 'green', Y: 'yellow', B: 'grey' };
+function tiles(word, pat, cls = '') {
+  const lab = pat ? word.toUpperCase() + ': ' + [...pat].map(c => COLOR[c]).join(', ') : word.toUpperCase();
+  return `<span class="tiles ${cls}" role="img" aria-label="${lab}">` +
+    [...word.padEnd(5)].map((c, i) => `<span class="t ${pat ? pat[i] : (c.trim() ? 'N' : 'E')}">${c.trim()}</span>`).join('') + '</span>';
+}
+const stateRows = s => s.rows.map(([g, p]) => tiles(g, p)).join('');
+const esc = s => s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+function candInfo(s, mode) {
+  if (mode === 'count') return `<span class="pill">${s.cands.length} Candidates left</span>`;
+  if (mode === 'list') return `<div><span class="pill">${s.cands.length} Candidates</span><div>${s.cands.map(c => `<span class="cand">${c}</span>`).join('')}</div></div>`;
+  return '';
+}
+function altsTable(s, g, k = 5) {
+  const n = s.cands.length, opt = Math.min(...s.alts.map(a => a[1]));
+  const rows = s.alts.slice(0, k).map(([w, t]) =>
+    `<tr class="${w === g ? 'you' : ''}"><td class="w">${w}</td><td>${t === opt ? '<span class="pill opt">optimal</span>' : ''}${w === s.guess ? ' <span class="small muted">tree</span>' : ''}${s.cands.includes(w) ? ' <span class="small muted">Candidate</span>' : ''}</td><td class="n">${(t / n).toFixed(3)}</td><td class="n">${fmt((t - opt) / n)}</td></tr>`).join('');
+  return `<table class="alts"><tr class="muted"><td>Top alternatives</td><td></td><td class="n">Exp. guesses</td><td class="n">vs best</td></tr>${rows}</table>`;
+}
+
+/* ---------- Run state (in memory, shared across variants so you can compare the same Run) ---------- */
+const params = new URLSearchParams(location.search);
+let run = drawRun(params.get('seed') || Math.random().toString(36).slice(2, 8));
+let ui = {}; // per-variant view state
+function newRun() { run = drawRun(Math.random().toString(36).slice(2, 8)); ui = {}; render(); }
+const cur = () => run.rounds.findIndex(r => !r.guess);
+
+/* ---------- Variant A: Wordle board + on-screen keyboard, one Round at a time ---------- */
+function A(mode) {
+  const i = cur();
+  if (i < 0) return Abreak();
+  const s = run.rounds[i].state, typed = ui.typed || '', confirm = ui.confirm;
+  const kstate = {};
+  for (const [g, p] of s.rows) [...g].forEach((c, j) => { const rank = { B: 0, Y: 1, G: 2 };
+    if (!(c in kstate) || rank[p[j]] > rank[kstate[c]]) kstate[c] = p[j]; });
+  const future = Math.max(0, 6 - s.rows.length - 1);
+  const keys = ['qwertyuiop', 'asdfghjkl', '⏎zxcvbnm⌫'].map(r => `<div>${[...r].map(c =>
+    `<button data-k="${c}" class="${c === '⏎' || c === '⌫' ? 'wide' : kstate[c] || ''}" aria-label="${c === '⏎' ? 'Enter' : c === '⌫' ? 'Backspace' : c}">${c === '⏎' ? 'ENTER' : c}</button>`).join('')}</div>`).join('');
+  return `<div class="A">
+    <div class="pips" aria-label="Round ${i + 1} of 5">${run.rounds.map((r, j) => `<i class="${r.guess ? 'done' : j === i ? 'cur' : ''}"></i>`).join('')}<span class="small muted">&nbsp;Round ${i + 1} of 5 · turn ${s.turn}</span></div>
+    ${candInfo(s, mode)}
+    <div class="board">${stateRows(s)}${tiles(typed, null, (confirm ? 'confirm' : '') + (ui.shake ? ' shake' : ''))}${Array(future).fill(`<span class="tiles">${'<span class="t F"></span>'.repeat(5)}</span>`).join('')}</div>
+    <div class="msg" role="status" aria-live="polite">${ui.msg || 'Type your Guess for this Game state.'}</div>
+    <div class="kb">${keys}</div></div>`;
+}
+function Akey(k) {
+  if (cur() < 0) return;
+  ui.typed = ui.typed || ''; ui.shake = false;
+  if (k === '⌫') { ui.typed = ui.typed.slice(0, -1); ui.confirm = false; ui.msg = ''; }
+  else if (k === '⏎') {
+    if (ui.confirm) { run.rounds[cur()].guess = ui.typed; ui.typed = ''; ui.confirm = false;
+      ui.msg = cur() < 0 ? '' : `Locked in. No reveal until the end of the Run.`; }
+    else if (ui.typed.length < 5) { ui.msg = 'Not enough letters'; ui.shake = true; }
+    else if (!WORDS.has(ui.typed)) { ui.msg = `${ui.typed.toUpperCase()} is not an allowed Guess`; ui.shake = true; }
+    else { ui.confirm = true; ui.msg = `Lock in ${ui.typed.toUpperCase()}? Enter again to confirm · ⌫ to edit`; }
+  } else if (/^[a-z]$/.test(k) && ui.typed.length < 5 && !ui.confirm) { ui.typed += k; ui.msg = ''; }
+  render();
+}
+function Abreak() {
+  const scored = run.rounds.map(r => ({ ...r, sc: score(r.state, r.guess) }));
+  const total = scored.reduce((t, r) => t + r.sc.points, 0);
+  return `<div class="Abd"><div class="total"><span class="muted">Run complete</span><b>${total} / 500</b><span class="small muted">placeholder points · ${scored.map(r => emoji(r.sc)).join('')}</span></div>
+  ${scored.map((r, j) => { const s = r.state, sc = r.sc, best = optimalSet(s);
+    return `<section class="rcard" aria-label="Round ${j + 1}"><div class="mini">${stateRows(s)}${tiles(r.guess)}</div><div>
+      <h3>Round ${j + 1} <span class="small muted">turn ${s.turn} · ${s.cands.length} Candidates · Path frequency ${pathFreq(s)}</span><span class="pts">${sc.points}</span></h3>
+      <div>You played <b>${r.guess.toUpperCase()}</b>: <span class="pill ${sc.extra === 0 ? 'opt' : ''}">${sc.tier}</span> ${fmt(sc.extra)} Expected guesses ${sc.exact ? '' : '<span class="pill est" title="prototype estimate">≈ est.</span>'}</div>
+      <div class="costbar" title="0 to +0.5 Expected guesses"><span style="left:${Math.min(100, sc.extra / 0.5 * 100)}%"></span></div>
+      <div class="small muted">Optimal: <b>${s.guess.toUpperCase()}</b> (tree)${best.length > 1 ? ' · Also optimal: ' + best.filter(w => w !== s.guess).map(w => w.toUpperCase()).join(', ') : ''}</div>
+      ${altsTable(s, r.guess)}
+      <div style="margin-top:8px"><a href="${visLink(s)}" target="_blank">Open in Visualiser →</a></div></div></section>`; }).join('')}
+  <p style="text-align:center"><button class="btn primary" onclick="newRun()">New Run</button></p></div>`;
+}
+
+/* ---------- Variant B: worksheet, all 5 Rounds on one page, submit the Run as a whole ---------- */
+function B(mode) {
+  if (ui.submitted) return Bbreak();
+  ui.vals = ui.vals || ['', '', '', '', ''];
+  const ok = ui.vals.map(v => WORDS.has(v)), n = ok.filter(Boolean).length;
+  return `<div class="B"><div class="bar"><b>Run · 5 Rounds</b><span class="pill">${n} of 5 answered</span><span class="small muted">Answer in any order; edit freely until you submit. Scores come after.</span>
+    <span style="margin-left:auto"></span>${ui.ask ? `<span>Submit? You can't change Guesses after.</span><button class="btn primary" id="bYes">Submit Run</button><button class="btn" id="bNo">Keep editing</button>`
+      : `<button class="btn primary" id="bSub" ${n < 5 ? 'disabled' : ''}>Submit Run</button>`}</div>
+  <div class="sheet">${run.rounds.map((r, j) => { const s = r.state, v = ui.vals[j];
+    return `<div class="srow"><div class="num">${j + 1}</div><div class="mini">${stateRows(s)}</div>
+      <div class="cl small">${mode === 'none' ? `<span class="muted">turn ${s.turn}</span>` : candInfo(s, mode)}</div>
+      <div class="inp"><label class="sr" for="in${j}">Guess for Round ${j + 1}</label>
+      <input id="in${j}" data-j="${j}" maxlength="5" autocomplete="off" spellcheck="false" value="${esc(v)}" class="${v.length === 5 ? (ok[j] ? 'ok' : 'no') : ''}" placeholder="·····">
+      <div class="v" aria-live="polite">${v.length === 5 ? (ok[j] ? '✓ allowed Guess' : '✗ not an allowed Guess') : ''}</div></div></div>`; }).join('')}</div></div>`;
+}
+function Bbreak() {
+  const scored = run.rounds.map((r, j) => ({ ...r, g: ui.vals[j], sc: score(r.state, ui.vals[j]) }));
+  const total = scored.reduce((t, r) => t + r.sc.points, 0);
+  ui.open = ui.open ?? 0;
+  return `<div class="B"><div class="bar"><b>Run complete: ${total} / 500</b><span class="small muted">placeholder points · click a row for detail</span><span style="margin-left:auto">${scored.map(r => emoji(r.sc)).join('')}</span></div>
+  <table class="bd"><tr><th>#</th><th class="hide-s">Game state</th><th>You</th><th>Best</th><th class="n">Cost</th><th class="n">Pts</th></tr>
+  ${scored.map((r, j) => { const s = r.state, sc = r.sc, best = optimalSet(s);
+    const row = `<tr class="main" data-j="${j}" tabindex="0" aria-expanded="${ui.open === j}"><td>${j + 1}</td><td class="hide-s"><div class="mini">${stateRows(s)}</div></td>
+      <td class="w">${r.g}${sc.exact ? '' : ' <span class="pill est">≈</span>'}</td><td class="w">${best.map(w => w).join(' / ')}</td><td class="n">${fmt(sc.extra)}</td><td class="n"><b>${sc.points}</b></td></tr>`;
+    if (ui.open !== j) return row;
+    const n = s.cands.length, max = 0.5, x = e => Math.min(100, e / max * 100);
+    return row + `<tr class="det"><td></td><td colspan="5">
+      <div class="small">Turn ${s.turn} · ${n} Candidates · Path frequency ${pathFreq(s)} · Optimal: <b>${s.guess.toUpperCase()}</b> (tree)${best.length > 1 ? ', also optimal ' + best.filter(w => w !== s.guess).join(', ').toUpperCase() : ''}${sc.isCand ? ' · your Guess was a Candidate' : ''}</div>
+      <div class="nl" aria-label="Your Guess costs ${fmt(sc.extra)} Expected guesses; ticks are the top-10 alternatives">
+        ${s.alts.map(a => `<span class="tk" style="left:${x((a[1] - sc.opt) / n)}%" title="${a[0]} ${fmt((a[1] - sc.opt) / n)}"></span>`).join('')}
+        <span class="you" style="left:${x(sc.extra)}%">${r.g.toUpperCase()}</span>
+        ${[0, 0.1, 0.2, 0.3, 0.4, 0.5].map(t => `<span class="ax" style="left:${x(t)}%">${t ? '+' + t : '0'}${t === 0.5 ? '+' : ''}</span>`).join('')}</div>
+      <div style="margin-top:22px">${altsTable(s, r.g, 10)}</div>
+      <div style="margin-top:6px"><a href="${visLink(s)}" target="_blank">Open in Visualiser →</a></div></td></tr>`; }).join('')}
+  </table><p><button class="btn primary" onclick="newRun()">New Run</button></p></div>`;
+}
+
+/* ---------- Variant C: focus card, one Round at a time, then a staged Round-by-Round reveal ---------- */
+function C(mode) {
+  const i = cur();
+  if (i < 0) return Creveal();
+  const s = run.rounds[i].state, v = ui.v || '';
+  const valid = v.length === 5 && WORDS.has(v);
+  return `<div class="C"><div class="prog"><div style="width:${i * 20}%"></div></div>
+    <div class="small muted">Round ${i + 1} / 5</div>
+    <div class="board">${stateRows(s)}</div>
+    ${candInfo(s, mode)}
+    ${ui.ask ? `<div class="confirm flip"><div class="muted small">Lock in</div><div style="margin:8px 0 14px">${tiles(v, null)}</div>
+        <button class="btn primary" id="cYes">Lock in</button> <button class="btn" id="cNo">Edit</button></div>`
+      : `<h2>What would you play?</h2><label class="sr" for="cin">Your Guess</label>
+        <input id="cin" maxlength="5" autocomplete="off" spellcheck="false" value="${esc(v)}">
+        <div class="v" aria-live="polite" style="color:${v.length === 5 && !valid ? 'var(--bad)' : 'var(--mute)'}">${v.length === 5 ? (valid ? 'Press Enter to lock in' : 'Not an allowed Guess') : ' '}</div>
+        <button class="btn primary" id="cGo" ${valid ? '' : 'disabled'}>Lock in →</button>`}
+    <p class="small muted" style="margin-top:30px">${run.rounds.slice(0, i).map((r, j) => `R${j + 1} <b>${r.guess.toUpperCase()}</b>`).join(' · ') || 'No reveals until the end of the Run.'}</p></div>`;
+}
+function Creveal() {
+  const scored = run.rounds.map(r => ({ ...r, sc: score(r.state, r.guess) }));
+  const k = ui.shown || 0, total = scored.slice(0, k).reduce((t, r) => t + r.sc.points, 0);
+  const cards = scored.slice(0, k).map((r, j) => { const s = r.state, sc = r.sc, best = optimalSet(s);
+    return `<div class="rv ${j === k - 1 ? 'flip' : ''}"><div class="head"><b>Round ${j + 1}</b><span class="pill ${sc.extra === 0 ? 'opt' : ''}">${sc.tier}</span><span class="big">+${sc.points}</span></div>
+      <div class="mini">${stateRows(s)}</div>
+      <div>You: <b>${r.guess.toUpperCase()}</b> ${fmt(sc.extra)} ${sc.exact ? '' : '<span class="pill est">≈</span>'} &nbsp; Best: <b>${best.join(', ').toUpperCase()}</b></div>
+      ${j === k - 1 || ui.expand === j ? altsTable(s, r.guess, 3) : `<button class="btn small" data-x="${j}" style="margin-top:6px;padding:4px 8px">Details</button>`}
+      <div class="small" style="margin-top:6px"><a href="${visLink(s)}" target="_blank">Open in Visualiser →</a></div></div>`; }).join('');
+  const done = k >= 5;
+  return `<div class="C"><div class="small muted">Run complete</div><div class="running" aria-live="polite">${total}</div><div class="small muted">of 500 · placeholder points</div>
+    ${done ? `<div class="grid" aria-label="Share grid">${scored.map(r => emoji(r.sc)).join('')}</div><button class="btn" id="cShare">Copy result</button> <button class="btn primary" onclick="newRun()">New Run</button>` : `<p><button class="btn primary" id="cNext">${k ? 'Reveal Round ' + (k + 1) : 'Reveal Round 1'}</button> <button class="btn" id="cAll">Reveal all</button></p>`}
+    ${cards}</div>`;
+}
+
+/* ---------- Switcher + render ---------- */
+const VARIANTS = { A: 'Wordle board + keyboard', B: 'Worksheet: all 5 at once', C: 'Focus card + staged reveal' };
+const DEFAULT_CANDS = { A: 'count', B: 'list', C: 'none' };
+const keys = Object.keys(VARIANTS);
+const variant = () => { const v = new URLSearchParams(location.search).get('variant'); return keys.includes(v) ? v : 'A'; };
+const candsMode = () => { const c = new URLSearchParams(location.search).get('cands'); return ['none', 'count', 'list'].includes(c) ? c : DEFAULT_CANDS[variant()]; };
+function setParam(k, v) { const u = new URL(location); v == null ? u.searchParams.delete(k) : u.searchParams.set(k, v); history.replaceState(null, '', u); }
+function go(d) { setParam('variant', keys[(keys.indexOf(variant()) + d + keys.length) % keys.length]); setParam('cands', null); ui = {}; render(); }
+document.getElementById('prev').onclick = () => go(-1);
+document.getElementById('next').onclick = () => go(1);
+document.getElementById('newBtn').onclick = newRun;
+document.getElementById('candsBtn').onclick = () => { const m = ['none', 'count', 'list']; setParam('cands', m[(m.indexOf(candsMode()) + 1) % 3]); render(); };
+
+function render() {
+  const v = variant(), app = document.getElementById('app');
+  const focusId = document.activeElement && document.activeElement.id, caret = document.activeElement && document.activeElement.selectionStart;
+  app.innerHTML = { A, B, C }[v](candsMode()) + `<details id="proto"><summary>Prototype state</summary><pre>${esc(JSON.stringify({
+    variant: v, cands: candsMode(), seed: run.seed, current: cur() < 0 ? 'done' : cur() + 1,
+    rounds: run.rounds.map(r => ({ state: r.state.rows.map(([g, p]) => g + ' ' + p).join(' / '), turn: r.state.turn, cands: r.state.cands.length, guess: r.guess })), ui }, null, 1))}</pre></details>`;
+  document.getElementById('vlabel').innerHTML = `${v} <span class="vn">(${VARIANTS[v]})</span>`;
+  document.getElementById('candsBtn').textContent = 'Candidates: ' + candsMode();
+  // wire variant controls
+  app.querySelectorAll('.kb button').forEach(b => b.onclick = () => Akey(b.dataset.k));
+  app.querySelectorAll('.srow input').forEach(inp => inp.oninput = () => { ui.vals[+inp.dataset.j] = inp.value.toLowerCase().replace(/[^a-z]/g, ''); ui.ask = false; render(); });
+  const on = (id, f) => { const e = document.getElementById(id); if (e) e.onclick = f; };
+  on('bSub', () => { ui.ask = true; render(); }); on('bNo', () => { ui.ask = false; render(); });
+  on('bYes', () => { ui.submitted = true; run.rounds.forEach((r, j) => r.guess = ui.vals[j]); render(); });
+  app.querySelectorAll('tr.main').forEach(tr => { const f = () => { ui.open = ui.open === +tr.dataset.j ? -1 : +tr.dataset.j; render(); };
+    tr.onclick = f; tr.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); f(); } }; });
+  const cin = document.getElementById('cin');
+  if (cin) { cin.oninput = () => { ui.v = cin.value.toLowerCase().replace(/[^a-z]/g, ''); render(); };
+    cin.onkeydown = e => { if (e.key === 'Enter' && ui.v && ui.v.length === 5 && WORDS.has(ui.v)) { ui.ask = true; render(); } };
+    if (v === 'C' && !ui.ask) setTimeout(() => cin.focus(), 0); }
+  on('cGo', () => { ui.ask = true; render(); });
+  on('cNo', () => { ui.ask = false; render(); });
+  on('cYes', () => { run.rounds[cur()].guess = ui.v; ui.v = ''; ui.ask = false; render(); });
+  if (document.getElementById('cYes')) document.getElementById('cYes').focus();
+  on('cNext', () => { ui.shown = (ui.shown || 0) + 1; render(); });
+  on('cAll', () => { ui.shown = 5; render(); });
+  on('cShare', () => { const sc = run.rounds.map(r => score(r.state, r.guess));
+    navigator.clipboard && navigator.clipboard.writeText(`Wordle Ranked trainer ${sc.reduce((t, s) => t + s.points, 0)}/500\n${sc.map(emoji).join('')}`);
+    document.getElementById('cShare').textContent = 'Copied'; });
+  app.querySelectorAll('[data-x]').forEach(b => b.onclick = () => { ui.expand = +b.dataset.x; render(); });
+  if (focusId && focusId !== 'cin') { const e = document.getElementById(focusId); if (e) { e.focus(); if (e.setSelectionRange && caret != null) e.setSelectionRange(caret, caret); } }
+  if (focusId === 'cin' && cin) { cin.focus(); cin.setSelectionRange(caret, caret); }
+  ui.shake = false;
+}
+document.addEventListener('keydown', e => {
+  const t = e.target, typing = t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable;
+  if (typing || e.metaKey || e.ctrlKey || e.altKey) return;
+  if (variant() === 'A' && cur() >= 0) {
+    if (e.key === 'Enter') { e.preventDefault(); return Akey('⏎'); }
+    if (e.key === 'Backspace') return Akey('⌫');
+    if (/^[a-zA-Z]$/.test(e.key)) return Akey(e.key.toLowerCase());
+  }
+  if (e.key === 'ArrowLeft') go(-1); else if (e.key === 'ArrowRight') go(1);
+});
+render();
+</script>
+</body>
+</html>

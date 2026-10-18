@@ -1,0 +1,312 @@
+<!doctype html>
+<!--
+  PROTOTYPE — throwaway. Ticket: "Page layout: Board walk plus stats".
+  Three page layouts for the Board walk + stats graphs, switchable via ?variant=A|B|C (bottom bar or ← / →).
+  Tree: Alex Selby's optimal SALET tree (MIT). Comparison and opener numbers are PLACEHOLDERS
+  (greedy-entropy over Answers only; opener entropy over Answers only), computed by stats.py.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Layout Prototype</title>
+<style>
+  :root { --bg:#fafaf8; --fg:#1a1a1a; --mute:#6b6b6b; --line:#e2e2de; --card:#fff;
+          --G:#6aaa64; --Y:#c9b458; --B:#787c7e; --accent:#3b6fd8; --alt:#e08a1e; --hl:#ffe08a; }
+  * { box-sizing:border-box; }
+  body { margin:0; font:14px/1.4 system-ui, -apple-system, sans-serif; background:var(--bg); color:var(--fg); }
+  header { display:flex; gap:16px; align-items:center; padding:12px 16px; border-bottom:1px solid var(--line); background:var(--card); flex-wrap:wrap; }
+  header h1 { font-size:16px; margin:0; }
+  header .sub { color:var(--mute); font-size:12px; }
+  .search { margin-left:auto; display:flex; gap:8px; align-items:center; }
+  .search input { font:600 18px/1 system-ui, sans-serif; letter-spacing:.15em; padding:10px 14px; border:2px solid #c9ccd4; border-radius:8px; width:220px; text-transform:uppercase; }
+  .search input:focus { outline:none; border-color:var(--accent); }
+  .search .msg { color:var(--mute); font-size:12px; min-width:110px; }
+  main { padding:16px; padding-bottom:90px; max-width:1400px; margin:0 auto; }
+  h2 { font-size:15px; margin:0 0 8px; } h3 { font-size:14px; margin:0 0 4px; }
+  .muted { color:var(--mute); } .small { font-size:12px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:8px; padding:12px; }
+  .tiles { display:inline-flex; gap:2px; }
+  .t { width:22px; height:22px; display:inline-flex; align-items:center; justify-content:center; font-weight:700; font-size:12px; color:#fff; border-radius:3px; text-transform:uppercase; }
+  .t.G{background:var(--G)} .t.Y{background:var(--Y)} .t.B{background:var(--B)} .t.N{background:#fff;color:var(--fg);border:2px solid #d3d6da}
+  .t.sm { width:12px; height:12px; font-size:0; border-radius:2px; }
+  .t.lg { width:52px; height:52px; font-size:26px; border-radius:4px; }
+  .stats { display:flex; gap:14px; flex-wrap:wrap; color:var(--mute); font-size:12px; }
+  .stats b { color:var(--fg); font-size:14px; }
+  .chip { display:inline-block; padding:1px 6px; margin:2px; border:1px solid var(--line); border-radius:10px; font-size:11px; text-transform:uppercase; background:var(--card); cursor:pointer; }
+  .chip.on { background:var(--hl); }
+  .bar { height:8px; background:#cfd8ea; border-radius:4px; }
+  .ph { display:inline-block; font-size:10px; background:#fde7d1; color:#8a4b0f; border-radius:4px; padding:0 5px; margin-left:4px; vertical-align:middle; }
+  /* board walk */
+  .board { display:flex; flex-direction:column; gap:6px; align-items:center; }
+  .brow { display:flex; gap:4px; cursor:pointer; }
+  .brow.cur .t { outline:2px dashed var(--accent); outline-offset:1px; }
+  .brow.paint .t { cursor:pointer; user-select:none; }
+  .paintbar { display:flex; flex-direction:column; align-items:center; gap:4px; margin-top:4px; text-align:center; }
+  .paintbar .bad { color:#b3452c; }
+  button.go { font:inherit; padding:6px 16px; border:0; border-radius:6px; background:var(--accent); color:#fff; cursor:pointer; }
+  button.go:disabled { background:#c5c9d3; cursor:default; }
+  .bitsq { display:inline-flex; width:16px; height:16px; border-radius:50%; background:#e6e9f0; color:var(--accent); font-size:11px; align-items:center; justify-content:center; cursor:pointer; margin-left:2px; }
+  .explain { font-size:12px; background:#f3f6fd; border-radius:6px; padding:8px; margin-top:6px; max-width:320px; }
+  details.cands summary { cursor:pointer; font-weight:600; font-size:13px; }
+  details.cands > div { margin-top:6px; max-height:200px; overflow-y:auto; }
+  .prow { display:grid; grid-template-columns:auto 44px 1fr 86px; gap:8px; align-items:center; padding:3px 4px; cursor:pointer; border-radius:4px; }
+  .prow:hover { background:#f3f6fd; } .prow.on { background:#e5edfc; } .prow.path { background:#fff3d6; }
+  .prow .cnt { text-align:right; font-variant-numeric:tabular-nums; } .prow .nx { font-size:11px; text-transform:uppercase; color:var(--mute); }
+  .plist { overflow-y:auto; }
+  .whatif { display:flex; gap:6px; align-items:center; margin:6px 0 10px; flex-wrap:wrap; }
+  .whatif input { font:600 14px system-ui; letter-spacing:.1em; text-transform:uppercase; width:110px; padding:5px 8px; border:1px solid #c9ccd4; border-radius:6px; }
+  .wires { font-size:12px; width:100%; }
+  .strip { display:flex; gap:1px; height:14px; margin:2px 0; } .strip div { background:#9fb3dc; }
+  .strip.alt div { background:#f0b878; }
+  .cmp { display:flex; gap:12px; font-size:13px; margin-top:6px; justify-content:center; }
+  .cmp span b { font-size:16px; }
+  .openers { display:flex; gap:6px; flex-wrap:wrap; align-items:center; }
+  .opener { padding:4px 10px; border:1px solid var(--line); border-radius:999px; background:var(--card); font-size:12px; text-transform:uppercase; cursor:pointer; font-weight:600; letter-spacing:.05em; }
+  .opener.on { background:var(--fg); color:#fff; border-color:var(--fg); }
+  .opener.off { opacity:.5; cursor:not-allowed; }
+  .scope { font-size:12px; color:var(--mute); margin-bottom:8px; display:flex; gap:6px; align-items:center; flex-wrap:wrap; }
+  .scope b { color:var(--fg); text-transform:uppercase; }
+  /* charts */
+  svg text { font:11px system-ui; fill:var(--mute); }
+  .hbar { cursor:pointer; } .hbar:hover { opacity:.8; }
+  .legend { display:flex; gap:12px; font-size:11px; color:var(--mute); }
+  .legend i { display:inline-block; width:10px; height:10px; border-radius:2px; margin-right:4px; vertical-align:middle; }
+  .heat { display:grid; grid-template-columns:20px repeat(5, 1fr); gap:1px; font-size:10px; }
+  .heat div { text-align:center; padding:1px 0; border-radius:2px; }
+  .heat .lab { color:var(--mute); text-transform:uppercase; font-weight:600; }
+  .lb { display:grid; grid-template-columns:22px 60px 1fr 46px; gap:6px; align-items:center; font-size:12px; padding:1px 0; }
+  .lb .w { text-transform:uppercase; font-weight:600; letter-spacing:.05em; }
+  .hard .grp { border-top:1px solid #f0f0ec; padding:6px 0; }
+  /* layout A: long scroll */
+  .A-top { display:grid; grid-template-columns:360px 1fr; gap:16px; align-items:start; }
+  .A-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(380px, 1fr)); gap:16px; margin-top:24px; }
+  /* layout B: tabs */
+  .tabs { display:flex; gap:4px; border-bottom:1px solid var(--line); margin-bottom:16px; }
+  .tab { padding:8px 16px; cursor:pointer; border:1px solid transparent; border-bottom:0; border-radius:8px 8px 0 0; color:var(--mute); font-weight:600; }
+  .tab.on { background:var(--card); border-color:var(--line); color:var(--fg); margin-bottom:-1px; }
+  .B-explore { display:grid; grid-template-columns:360px 1fr; gap:16px; align-items:start; }
+  .B-stats { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  /* layout C: dashboard */
+  .C { display:grid; grid-template-columns:330px minmax(300px, 1fr) 380px; gap:12px; align-items:start; }
+  .C .rail { display:flex; flex-direction:column; gap:10px; max-height:calc(100vh - 120px); overflow-y:auto; }
+  .C details.card > summary { cursor:pointer; font-weight:600; }
+  .C details.card h3 { display:none; }
+  .topnav { display:flex; gap:2px; margin-left:12px; }
+  .topnav a { padding:8px 14px; border-radius:6px; cursor:pointer; color:var(--mute); font-weight:600; }
+  .topnav a:hover { background:#f1f2f4; } .topnav a.on { background:var(--fg); color:#fff; }
+  #hdr-extra select { font:600 13px system-ui; padding:4px 8px; border-radius:6px; }
+  @media (max-width:1000px) { .A-top, .B-explore, .B-stats, .C { grid-template-columns:1fr; } }
+  #switcher { position:fixed; left:50%; bottom:16px; transform:translateX(-50%); background:#111; color:#fff; border-radius:999px; padding:6px 8px; display:flex; gap:8px; align-items:center; box-shadow:0 4px 18px rgba(0,0,0,.35); z-index:99; font-size:13px; }
+  #switcher button { background:#333; color:#fff; border:0; border-radius:999px; width:30px; height:30px; cursor:pointer; font-size:15px; }
+  #switcher span { min-width:220px; text-align:center; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Optimal Wordle tree</h1>
+  <span class="sub">2,315 Answers · tree by Alex Selby (MIT)</span>
+  <span id="hdr-extra"></span>
+  <div class="search"><input id="q" placeholder="Answer…" maxlength="5" autocomplete="off"><span class="msg" id="qmsg">see any Answer's Path</span></div>
+</header>
+<main id="app"></main>
+<div id="switcher"><button id="prev">←</button><span id="vlabel"></span><button id="next">→</button></div>
+<script>
+const RAW = __TREE__;
+const STATS = __STATS__;   // PLACEHOLDER data: {greedy: {answer: guesses}, openers: [[word, bits]]}
+
+// ---------- model ----------
+function build(raw, parent, pat, depth) {
+  const n = { guess: raw[0], pat, parent, depth, kids: [], answers: [], solvedHere: false };
+  for (const [p, c] of Object.entries(raw[1])) {
+    if (c === 0) { n.solvedHere = true; n.answers.push(n.guess); continue; }
+    const k = build(c, n, p, depth + 1); n.kids.push(k); n.answers.push(...k.answers);
+  }
+  n.kids.sort((a, b) => b.answers.length - a.answers.length);
+  n.cost = (n.solvedHere ? 1 : 0) + n.kids.reduce((s, k) => s + k.answers.length + k.cost, 0);
+  n.size = n.answers.length; n.expected = n.cost / n.size;
+  n.groups = n.kids.map(k => k.size).concat(n.solvedHere ? [1] : []);
+  n.entropy = entropyOf(n.groups, n.size);
+  return n;
+}
+function entropyOf(groups, size) { return -groups.reduce((s, g) => s + (g / size) * Math.log2(g / size), 0); }
+const ROOT = build(RAW, null, null, 0);
+const ANSWERS = new Set(ROOT.answers);
+const OPT = {}; (function walk(n) { if (n.solvedHere) OPT[n.guess] = n.depth + 1; n.kids.forEach(walk); })(ROOT);
+function nodeOf(ans) { let n = ROOT; while (n.guess !== ans) n = n.kids.find(k => k.answers.includes(ans)); return n; }
+function chain(n) { const o = []; while (n) { o.unshift(n); n = n.parent; } return o; }
+function feedback(g, a) {
+  const r = ['B','B','B','B','B'], rem = [...a];
+  for (let i = 0; i < 5; i++) if (g[i] === a[i]) { r[i] = 'G'; rem[i] = null; }
+  for (let i = 0; i < 5; i++) if (r[i] === 'B') { const j = rem.indexOf(g[i]); if (j >= 0) { r[i] = 'Y'; rem[j] = null; } }
+  return r.join('');
+}
+
+// ---------- state ----------
+const S = { sel: ROOT, ans: null, draft: 'BBBBB', draftNode: null, bits: false, candOpen: null, whatIf: '', histPick: null, tab: 'explore' };
+function goto(n) { S.sel = n; S.histPick = null; render(); }
+function showAnswer(w) { S.ans = w; S.sel = nodeOf(w); q.value = w; qmsg.textContent = `solved in ${OPT[w]}`; render(); }
+
+// ---------- pieces ----------
+const tiles = (w, pat, cls = '') => `<span class="tiles">${[...w].map((c, i) => `<span class="t ${pat ? pat[i] : 'N'} ${cls}">${c}</span>`).join('')}</span>`;
+const patTiles = p => `<span class="tiles">${[...p].map(c => `<span class="t sm ${c}"></span>`).join('')}</span>`;
+const PH = '<span class="ph" title="prototype placeholder data">placeholder</span>';
+
+function Board() {
+  const ch = chain(S.sel), n = S.sel;
+  if (S.draftNode !== n) { S.draftNode = n; S.draft = 'BBBBB'; }
+  const solved = S.ans === n.guess;
+  const rows = ch.map((c, i) => {
+    if (i < ch.length - 1) return `<div class="brow" data-act="rewind" data-i="${i}" title="rewind">${tiles(c.guess, ch[i + 1].pat, 'lg')}</div>`;
+    if (solved) return `<div class="brow">${tiles(c.guess, 'GGGGG', 'lg')}</div>`;
+    return `<div class="brow cur paint">${[...c.guess].map((l, j) => `<span class="t lg ${S.draft[j]}" data-act="paint" data-j="${j}">${l}</span>`).join('')}</div>`;
+  }).join('') + Array.from({ length: Math.max(0, 6 - ch.length) }, () => `<div class="brow">${tiles('     ', null, 'lg')}</div>`).join('');
+  const m = S.draft === 'GGGGG' ? (n.solvedHere ? 'solved' : null) : n.kids.find(k => k.pat === S.draft);
+  const msg = m === 'solved' ? `<b>${n.guess.toUpperCase()}</b> is the Answer` : m ? `<b>${m.size}</b> candidate${m.size > 1 ? 's' : ''} give this feedback` : `<span class="bad">No remaining candidate gives this feedback</span>`;
+  return `<div class="board">${rows}
+    ${solved ? Comparison() : `<div class="paintbar"><span class="muted small">Click the letters to colour in your feedback</span><span>${msg}</span><button class="go" data-act="apply" ${m ? '' : 'disabled'}>Go →</button></div>`}
+    <div>${Stats(n)}</div></div>`;
+}
+function Stats(n) {
+  return `<div class="stats"><span><b>${n.size}</b> candidates</span><span><b>${n.expected.toFixed(3)}</b> exp. guesses</span><span><b>${n.entropy.toFixed(2)}</b> bits <a class="bitsq" data-act="bits">?</a></span></div>
+  ${S.bits ? `<div class="explain">Bits measure how much a Guess narrows things down. Each bit halves the candidates on average, so ${n.entropy.toFixed(2)} bits cuts ${n.size} candidates to about <b>${Math.max(1, n.size / 2 ** n.entropy).toFixed(1)}</b>. Expected guesses is what the tree actually minimises.</div>` : ''}`;
+}
+function Comparison() {
+  const w = S.ans;
+  return `<div class="cmp"><span>Optimal <b>${OPT[w]}</b></span><span>Greedy-entropy <b>${STATS.greedy[w]}</b>${PH}</span><span>Answers-only <b>—</b></span></div>`;
+}
+function Candidates() {
+  const n = S.sel;
+  if (!S.candOpen || S.candOpen.n !== n) S.candOpen = { n, open: n.size < 10 };
+  return `<details class="cands card" ${S.candOpen.open ? 'open' : ''}><summary>Candidates (${n.size})</summary><div>${n.answers.slice().sort().map(w => `<span class="chip ${w === S.ans ? 'on' : ''}" data-act="answer" data-w="${w}">${w}</span>`).join('')}</div></details>`;
+}
+function PatternList(maxH) {
+  const n = S.sel, max = n.kids.length ? n.kids[0].size : 1, pathKid = S.ans ? chain(nodeOf(S.ans))[n.depth + 1] : null;
+  return `<h3>Tree plays ${n.guess.toUpperCase()}</h3>
+    <div class="muted small">${n.size} candidates split into ${n.groups.length} groups · largest ${Math.max(...n.groups)}</div>
+    ${WhatIf()}
+    <div class="plist" style="max-height:${maxH}">${n.solvedHere ? `<div class="prow" data-act="answer" data-w="${n.guess}">${patTiles('GGGGG')}<span class="cnt">1</span><span class="muted">solved!</span><span></span></div>` : ''}
+    ${n.kids.map((k, j) => `<div class="prow ${k === pathKid ? 'path' : k.pat === S.draft ? 'on' : ''}" data-act="kid" data-j="${j}">${patTiles(k.pat)}<span class="cnt">${k.size}</span><div class="bar" style="width:${Math.max(3, 100 * k.size / max)}%"></div><span class="nx">then ${k.guess}</span></div>`).join('')}</div>`;
+}
+function WhatIf() {
+  return `<div class="whatif"><span class="small">What if you guessed</span><input id="wi" maxlength="5" placeholder="adieu" value="${S.whatIf}"><span class="small muted">instead?</span><div class="wires" id="wires">${WhatIfResult()}</div></div>`;
+}
+function WhatIfResult() {
+  const w = S.whatIf.toLowerCase(), n = S.sel;
+  if (w.length < 5) return '';
+  if (!ANSWERS.has(w)) return `<span class="muted">${w.toUpperCase()}: not in the prototype's word list (the real site accepts all 12,972 Guesses)</span>`;
+  const c = {}; n.answers.forEach(a => { const p = feedback(w, a); c[p] = (c[p] || 0) + 1; });
+  const g = Object.values(c).sort((a, b) => b - a), h = entropyOf(g, n.size), mine = n.groups.slice().sort((a, b) => b - a);
+  const strip = (gs, cls) => `<div class="strip ${cls}">${gs.map(x => `<div style="flex:${x}" title="${x}"></div>`).join('')}</div>`;
+  return `<div><b>${n.guess.toUpperCase()}</b> (tree): ${mine.length} groups · largest ${mine[0]} · ${n.entropy.toFixed(2)} bits</div>${strip(mine, '')}
+    <div><b>${w.toUpperCase()}</b>: ${g.length} groups · largest ${g[0]} · ${h.toFixed(2)} bits</div>${strip(g, 'alt')}`;
+}
+function Scope() {
+  const ch = chain(S.sel);
+  return `<div class="scope">Showing <b>${ch.length === 1 ? 'all 2,315 Answers' : ch.map(c => c.guess).join(' › ')}</b>${ch.length > 1 ? ` (${S.sel.size} candidates) · <a href="#" data-act="root">reset</a>` : ''}</div>`;
+}
+function Openers(asSelect) {
+  const list = ['salet', 'crane', 'slate', 'trace', 'crate', 'adieu', 'audio', 'roate'];
+  if (asSelect) return `<select title="opener">${list.map(w => `<option ${w === 'salet' ? '' : 'disabled'}>${w.toUpperCase()}${w === 'salet' ? ' (optimal)' : ''}</option>`).join('')}</select>`;
+  return `<div class="openers"><span class="small muted">Opener:</span>${list.map(w => `<span class="opener ${w === 'salet' ? 'on' : 'off'}" title="${w === 'salet' ? '' : 'lazy-loaded in the real site'}">${w}</span>`).join('')}</div>`;
+}
+
+// ---------- charts ----------
+function Histogram() {
+  const ans = S.sel.answers, bins = [1, 2, 3, 4, 5, 6, 7];
+  const opt = bins.map(b => ans.filter(a => OPT[a] === b).length), gr = bins.map(b => ans.filter(a => STATS.greedy[a] === b).length);
+  const last = Math.max(...bins.filter((b, i) => opt[i] || gr[i])), use = bins.filter(b => b <= last);
+  const W = 360, H = 150, mx = Math.max(...opt, ...gr), bw = (W - 30) / use.length;
+  const avg = arr => (ans.reduce((s, a) => s + arr[a], 0) / ans.length).toFixed(3);
+  const bars = use.map((b, i) => {
+    const x = 20 + i * bw, h1 = (H - 30) * opt[i] / mx, h2 = (H - 30) * gr[i] / mx;
+    return `<rect class="hbar" data-act="hist" data-s="opt" data-b="${b}" x="${x + 4}" y="${H - 20 - h1}" width="${bw / 2 - 5}" height="${h1}" fill="var(--accent)"><title>Optimal: ${opt[i]} Answers in ${b}</title></rect>
+      <rect class="hbar" data-act="hist" data-s="greedy" data-b="${b}" x="${x + bw / 2}" y="${H - 20 - h2}" width="${bw / 2 - 5}" height="${h2}" fill="var(--alt)"><title>Greedy: ${gr[i]} Answers in ${b}</title></rect>
+      <text x="${x + bw / 2}" y="${H - 6}" text-anchor="middle">${b}</text>
+      <text x="${x + bw / 4}" y="${H - 23 - h1}" text-anchor="middle">${opt[i] || ''}</text>`;
+  }).join('');
+  const pick = S.histPick ? ans.filter(a => (S.histPick.s === 'opt' ? OPT[a] : STATS.greedy[a]) === S.histPick.b) : null;
+  return `<h3>Guesses needed</h3><div class="legend"><span><i style="background:var(--accent)"></i>Optimal · avg ${avg(OPT)}</span><span><i style="background:var(--alt)"></i>Greedy-entropy · avg ${avg(STATS.greedy)}${PH}</span></div>
+    <svg width="100%" viewBox="0 0 ${W} ${H}">${bars}</svg>
+    ${pick ? `<div class="small"><b>${pick.length}</b> Answers take ${S.histPick.b} under ${S.histPick.s === 'opt' ? 'Optimal' : 'Greedy'}:</div><div style="max-height:110px;overflow:auto">${pick.sort().slice(0, 150).map(w => `<span class="chip" data-act="answer" data-w="${w}">${w}</span>`).join('')}</div>` : `<div class="small muted">Click a bar to list its Answers</div>`}`;
+}
+function Heatmap() {
+  const ans = S.sel.answers, L = 'abcdefghijklmnopqrstuvwxyz';
+  const cnt = [...L].map(l => [0, 1, 2, 3, 4].map(i => ans.filter(a => a[i] === l).length));
+  const mx = Math.max(1, ...cnt.flat()), rows = [...L].map((l, r) => cnt[r].some(x => x) ? `<div class="lab">${l}</div>${cnt[r].map(x => `<div style="background:rgba(106,170,100,${x / mx});color:${x / mx > .5 ? '#fff' : 'var(--mute)'}" title="${l.toUpperCase()}: ${x}">${x || ''}</div>`).join('')}` : '').join('');
+  return `<h3>Letter frequency by position</h3><div class="heat"><div></div>${[1, 2, 3, 4, 5].map(i => `<div class="lab">${i}</div>`).join('')}${rows}</div>`;
+}
+function Leaderboard() {
+  const top = STATS.openers.slice(0, 15), mx = top[0][1], mn = top[top.length - 1][1] - 0.1;
+  return `<h3>Best openers ${PH}</h3><div class="small muted" style="margin-bottom:6px">By entropy over Answers only. The real site shows Selby's exact top-105 totals (SALET = 7,920) with entropy as a second column.</div>
+    ${top.map(([w, h], i) => `<div class="lb"><span class="muted">${i + 1}</span><span class="w">${w}</span><div class="bar" style="width:${100 * (h - mn) / (mx - mn)}%"></div><span>${h.toFixed(2)}</span></div>`).join('')}`;
+}
+function Hardest() {
+  const hard = S.sel.answers.filter(a => OPT[a] >= 5);
+  const groups = {}; hard.forEach(a => { const ch = chain(nodeOf(a)), key = ch[Math.min(2, ch.length - 2)]; (groups[key.pat + key.guess] ||= { node: key, ws: [] }).ws.push(a); });
+  const gs = Object.values(groups).sort((a, b) => b.ws.length - a.ws.length);
+  return `<h3>Hardest Answers</h3><div class="small muted">${hard.length} Answers here need 5 guesses, grouped by the Game state that traps them</div>
+    <div class="hard" style="max-height:240px;overflow:auto">${gs.map(g => `<div class="grp"><a href="#" data-act="node" data-w="${g.ws[0]}" data-d="${g.node.depth}" class="small">${chain(g.node).map(c => c.guess.toUpperCase()).join(' › ')}</a> <span class="small muted">· ${g.node.size} candidates</span><div>${g.ws.map(w => `<span class="chip" data-act="answer" data-w="${w}">${w}</span>`).join('')}</div></div>`).join('') || '<div class="small muted">None in this subtree</div>'}</div>`;
+}
+
+// ---------- layouts ----------
+function A() {
+  return `<div style="margin-bottom:12px">${Openers()}</div>
+  <div class="A-top"><div style="display:flex;flex-direction:column;gap:12px"><div class="card">${Board()}</div>${Candidates()}</div><div class="card">${PatternList('520px')}</div></div>
+  <h2 style="margin-top:28px">Stats</h2>${Scope()}
+  <div class="A-grid" style="margin-top:0"><div class="card">${Histogram()}</div><div class="card">${Hardest()}</div><div class="card">${Heatmap()}</div><div class="card">${Leaderboard()}</div></div>`;
+}
+function B() {
+  const tabs = [['explore', 'Explore the tree'], ['stats', 'Stats'], ['openers', 'Openers']];
+  const body = S.tab === 'explore' ? `<div class="B-explore"><div style="display:flex;flex-direction:column;gap:12px"><div class="card">${Board()}</div>${Candidates()}</div><div class="card">${PatternList('calc(100vh - 330px)')}</div></div>`
+    : S.tab === 'stats' ? `${Scope()}<div class="B-stats"><div class="card">${Histogram()}</div><div class="card">${Hardest()}</div><div class="card">${Heatmap()}</div></div>`
+    : `<div class="B-stats"><div class="card"><h3>Explore another opener's tree</h3>${Openers()}<p class="small muted">Switching loads that opener's optimal tree and returns to Explore.</p></div><div class="card">${Leaderboard()}</div></div>`;
+  return body;
+}
+function C() {
+  return `<div class="C"><div style="display:flex;flex-direction:column;gap:12px"><div class="card">${Board()}</div>${Candidates()}</div>
+    <div class="card">${PatternList('calc(100vh - 260px)')}</div>
+    <div class="rail">${Scope()}
+      <details class="card" open><summary>Guesses needed</summary>${Histogram()}</details>
+      <details class="card" open><summary>Hardest Answers</summary>${Hardest()}</details>
+      <details class="card"><summary>Letter frequency</summary>${Heatmap()}</details>
+      <details class="card"><summary>Best openers</summary>${Leaderboard()}</details></div></div>`;
+}
+const VARIANTS = { A: ['Long scroll', A], B: ['Tabs', B], C: ['Dashboard rail', C] };
+
+// ---------- wiring ----------
+const q = document.getElementById('q'), qmsg = document.getElementById('qmsg'), app = document.getElementById('app');
+q.addEventListener('input', () => { const w = q.value.toLowerCase(); if (w.length < 5) { qmsg.textContent = "see any Answer's Path"; return; } if (!ANSWERS.has(w)) { qmsg.textContent = `${w.toUpperCase()} is not an Answer`; return; } if (S.tab !== 'explore' && cur() === 'B') S.tab = 'explore'; showAnswer(w); });
+const CYCLE = { B: 'Y', Y: 'G', G: 'B' };
+document.getElementById('hdr-extra').addEventListener('click', e => { const el = e.target.closest('[data-act="tab"]'); if (el) { S.tab = el.dataset.t; render(); } });
+app.addEventListener('click', e => {
+  const el = e.target.closest('[data-act]'); if (!el) return; const d = el.dataset, ch = chain(S.sel), n = S.sel;
+  switch (d.act) {
+    case 'rewind': return goto(ch[+d.i]);
+    case 'kid': return goto(n.kids[+d.j]);
+    case 'paint': S.draft = S.draft.slice(0, +d.j) + CYCLE[S.draft[+d.j]] + S.draft.slice(+d.j + 1); return render();
+    case 'apply': { const m = S.draft === 'GGGGG' ? 'solved' : n.kids.find(k => k.pat === S.draft); return m === 'solved' ? showAnswer(n.guess) : goto(m); }
+    case 'bits': S.bits = !S.bits; return render();
+    case 'answer': if (cur() === 'B') S.tab = 'explore'; return showAnswer(d.w);
+    case 'hist': S.histPick = { s: d.s, b: +d.b }; return render();
+    case 'tab': S.tab = d.t; return render();
+    case 'root': e.preventDefault(); S.ans = null; return goto(ROOT);
+    case 'node': e.preventDefault(); if (cur() === 'B') S.tab = 'explore'; return goto(chain(nodeOf(d.w))[+d.d]);
+  }
+});
+app.addEventListener('toggle', e => { if (e.target.classList.contains('cands')) S.candOpen.open = e.target.open; }, true);
+app.addEventListener('input', e => { if (e.target.id === 'wi') { S.whatIf = e.target.value; document.getElementById('wires').innerHTML = WhatIfResult(); } });
+const keys = Object.keys(VARIANTS);
+function cur() { const v = new URLSearchParams(location.search).get('variant'); return keys.includes(v) ? v : 'B'; }
+function go(dv) { const i = (keys.indexOf(cur()) + dv + keys.length) % keys.length; const u = new URL(location); u.searchParams.set('variant', keys[i]); history.replaceState(null, '', u); render(); }
+function render() {
+  const v = cur(); document.getElementById('vlabel').textContent = `${v} (${VARIANTS[v][0]})`;
+  document.getElementById('hdr-extra').innerHTML = v === 'C' ? `<span class="small muted">Opener</span> ${Openers(true)}` : v === 'B' ? `<nav class="topnav">${[['explore', 'Explore the tree'], ['stats', 'Stats'], ['openers', 'Openers']].map(([k, l]) => `<a class="${S.tab === k ? 'on' : ''}" data-act="tab" data-t="${k}">${l}</a>`).join('')}</nav>` : '';
+  const y = window.scrollY; app.innerHTML = VARIANTS[v][1](); window.scrollTo(0, y);
+}
+document.getElementById('prev').onclick = () => go(-1); document.getElementById('next').onclick = () => go(1);
+document.addEventListener('keydown', e => { if (e.target.closest('input,textarea,select,[contenteditable]')) return; if (e.key === 'ArrowLeft') go(-1); if (e.key === 'ArrowRight') go(1); });
+render();
+</script>
+</body>
+</html>

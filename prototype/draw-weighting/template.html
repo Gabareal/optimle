@@ -1,0 +1,345 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PROTOTYPE · Draw weighting</title>
+<style>
+  :root {
+    --bg: #fafaf8; --panel: #fff; --ink: #1d1d1b; --muted: #6b6b66; --line: #e4e3de;
+    --accent: #3a5bd9; --g: #6aaa64; --y: #c9b458; --b: #787c7e;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #151514; --panel: #1f1f1d; --ink: #ecebe6; --muted: #9b9a94; --line: #34332f; --accent: #8ea4ff; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.5 system-ui, -apple-system, sans-serif; }
+  main { max-width: 1100px; margin: 0 auto; padding: 28px 16px 80px; }
+  h1 { font-size: 24px; margin: 0 0 4px; }
+  h2 { font-size: 16px; margin: 0 0 12px; }
+  .lede { color: var(--muted); margin: 0 0 6px; max-width: 760px; }
+  .tag { display: inline-block; font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--accent); border: 1px solid var(--accent); border-radius: 4px; padding: 1px 6px; margin-bottom: 10px; }
+  section { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 18px; margin-top: 18px; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  @media (max-width: 800px) { .grid2 { grid-template-columns: 1fr; } }
+  .muted { color: var(--muted); }
+  .small { font-size: 13px; }
+  button { font: inherit; border: 1px solid var(--line); background: var(--panel); color: var(--ink); border-radius: 6px; padding: 6px 12px; cursor: pointer; }
+  button:hover { border-color: var(--accent); }
+  button.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+  button.done { opacity: .5; }
+  label { display: inline-flex; gap: 6px; align-items: center; margin-right: 14px; }
+  select, input[type=number], input[type=text] { font: inherit; padding: 3px 6px; border: 1px solid var(--line); border-radius: 5px; background: var(--panel); color: var(--ink); }
+  input[type=number] { width: 64px; }
+  .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 8px 0; }
+  .summary { font-size: 15px; padding: 10px 12px; border-left: 3px solid var(--accent); background: color-mix(in srgb, var(--accent) 7%, transparent); border-radius: 0 6px 6px 0; }
+  .changed { color: var(--accent); font-size: 13px; margin-top: 6px; min-height: 1.2em; }
+  .run { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; }
+  @media (max-width: 900px) { .run { grid-template-columns: repeat(2, 1fr); } }
+  .card { border: 1px solid var(--line); border-radius: 8px; padding: 10px; }
+  .card h3 { font-size: 13px; margin: 0 0 6px; color: var(--muted); font-weight: 600; }
+  .tiles { display: flex; gap: 2px; margin: 2px 0; }
+  .t { width: 22px; height: 22px; display: grid; place-items: center; color: #fff; font-weight: 700; font-size: 12px; text-transform: uppercase; border-radius: 3px; }
+  .t.G { background: var(--g); } .t.Y { background: var(--y); } .t.B { background: var(--b); }
+  .t.q { background: transparent; border: 2px dashed var(--line); color: var(--muted); }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; }
+  td, th { text-align: left; padding: 4px 6px; border-bottom: 1px solid var(--line); }
+  th { color: var(--muted); font-weight: 600; }
+  td.n { text-align: right; font-variant-numeric: tabular-nums; }
+  .bar { height: 8px; background: var(--accent); border-radius: 2px; }
+  .tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+  .tabs button.on { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .steps { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; margin-top: 10px; }
+  .kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 12px; }
+  @media (max-width: 700px) { .kpis { grid-template-columns: repeat(2, 1fr); } }
+  .kpi { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; }
+  .kpi b { display: block; font-size: 20px; }
+</style>
+</head>
+<body>
+<main>
+  <span class="tag">Prototype · throwaway</span>
+  <h1>How should a Run pick its 5 Game states?</h1>
+  <p class="lede">Each Round of the Ranked trainer draws one Eligible Game state from the SALET tree. These are the 283 states that aren't the opener and have at least 3 Candidates. This page lets you change <b>how strongly common states are favoured</b>, <b>which turn each Round draws from</b>, and <b>what may repeat</b>. Then draw Runs, or 1,000 of them, and judge how they feel.</p>
+  <p class="lede small">The weight of a state is Candidates<sup>α</sup>. With α = 1 this is <b>Path frequency</b>: the same as picking a random Answer and walking its Path. With α = 0 every state is equally likely.</p>
+
+  <section>
+    <h2>Current settings</h2>
+    <div class="summary" id="summary"></div>
+    <div class="changed" id="changed"></div>
+  </section>
+
+  <section>
+    <h2>Free play</h2>
+    <div class="row">
+      <label>Weighting α <input type="range" id="alpha" min="0" max="1" step="0.05"> <b id="alphaOut"></b></label>
+      <button data-alpha="0">Uniform (0)</button>
+      <button data-alpha="0.5">Square root (0.5)</button>
+      <button data-alpha="1">Path frequency (1)</button>
+    </div>
+    <div class="row">
+      <span class="muted">Which turn each Round draws from:</span>
+      <label><input type="radio" name="mode" value="schedule"> A fixed turn per Round</label>
+      <label><input type="radio" name="mode" value="random"> A random turn each Round</label>
+      <label><input type="radio" name="mode" value="any"> Any turn (no buckets)</label>
+    </div>
+    <div class="row" id="scheduleRow"></div>
+    <div class="row" id="randomRow">
+      <span class="muted">Chance of each turn:</span>
+      <label>turn 2 <input type="number" id="p2" min="0" max="100" step="5">%</label>
+      <label>turn 3 <input type="number" id="p3" min="0" max="100" step="5">%</label>
+      <label>turn 4 <input type="number" id="p4" min="0" max="100" step="5">%</label>
+    </div>
+    <div class="row">
+      <label><input type="checkbox" id="noTop"> No two Rounds after the same SALET feedback (the same first row)</label>
+    </div>
+    <div class="row">
+      <button class="primary" id="drawBtn">Draw a Run</button>
+      <button id="redrawBtn">Redraw this seed</button>
+      <label>Seed <input type="text" id="seed" size="10"></label>
+      <button id="simBtn">Simulate 1,000 Runs</button>
+    </div>
+  </section>
+
+  <section>
+    <h2>Guided walkthroughs</h2>
+    <div class="tabs" id="tabs"></div>
+    <div id="scenario"></div>
+  </section>
+
+  <section>
+    <h2>The Run</h2>
+    <div class="run" id="run"><p class="muted">Draw a Run to see it.</p></div>
+  </section>
+
+  <div class="grid2">
+    <section>
+      <h2>Odds for a single Round</h2>
+      <div class="row"><label>Turn <select id="oddsBucket"></select></label></div>
+      <div id="odds"></div>
+    </section>
+    <section>
+      <h2>1,000 Runs</h2>
+      <div id="sim"><p class="muted">Press “Simulate 1,000 Runs”.</p></div>
+    </section>
+  </div>
+</main>
+
+<script>
+/* ---------- The portable logic: pure functions, no DOM. ---------- */
+const Draw = (() => {
+  // Seeded PRNG (mulberry32) so a seed always gives the same Run, ready for a Daily Run.
+  function rng(seed) {
+    let h = 1779033703 ^ String(seed).length;
+    for (const c of String(seed)) { h = Math.imul(h ^ c.charCodeAt(0), 3432918353); h = (h << 13) | (h >>> 19); }
+    let a = h >>> 0;
+    return () => { a |= 0; a = (a + 0x6d2b79f5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+  }
+  const BUCKETS = { '2': [2], '3': [3], '4': [4], '3+': [3, 4], 'any': [2, 3, 4] };
+  const inBucket = (s, b) => BUCKETS[b].includes(s.turn);
+  const weight = (s, alpha) => Math.pow(s.cands.length, alpha);
+
+  function pickWeighted(pool, alpha, rand) {
+    const total = pool.reduce((t, s) => t + weight(s, alpha), 0);
+    let x = rand() * total;
+    for (const s of pool) { x -= weight(s, alpha); if (x <= 0) return s; }
+    return pool[pool.length - 1];
+  }
+  function bucketFor(cfg, round, rand) {
+    if (cfg.mode === 'any') return 'any';
+    if (cfg.mode === 'schedule') return cfg.schedule[round];
+    const ps = [['2', cfg.depth['2']], ['3', cfg.depth['3']], ['4', cfg.depth['4']]];
+    const total = ps.reduce((t, [, p]) => t + p, 0) || 1;
+    let x = rand() * total;
+    for (const [b, p] of ps) { x -= p; if (x < 0) return b; }
+    return '2';
+  }
+  // One Run: 5 Rounds, never the same state twice, optionally never the same first row twice.
+  function drawRun(states, cfg, seed) {
+    const rand = rng(seed), used = new Set(), usedTop = new Set(), rounds = [];
+    for (let r = 0; r < 5; r++) {
+      const bucket = bucketFor(cfg, r, rand);
+      let pool = states.filter(s => inBucket(s, bucket) && !used.has(s.key));
+      let relaxed = false;
+      if (cfg.noRepeatTop) {
+        const strict = pool.filter(s => !usedTop.has(s.top));
+        if (strict.length) pool = strict; else relaxed = true;
+      }
+      const state = pickWeighted(pool, cfg.alpha, rand);
+      const p = weight(state, cfg.alpha) / pool.reduce((t, s) => t + weight(s, cfg.alpha), 0);
+      // The Answer is just the dice: a random Candidate of the chosen state.
+      const answer = state.cands[Math.floor(rand() * state.cands.length)];
+      used.add(state.key); usedTop.add(state.top);
+      rounds.push({ round: r + 1, bucket, state, p, answer, relaxed });
+    }
+    return { seed, rounds };
+  }
+  // Exact odds for one Round drawn from a bucket, before any repeats are removed.
+  function odds(states, alpha, bucket) {
+    const pool = states.filter(s => inBucket(s, bucket));
+    const total = pool.reduce((t, s) => t + weight(s, alpha), 0);
+    const rows = pool.map(s => ({ state: s, p: weight(s, alpha) / total })).sort((a, b) => b.p - a.p);
+    const effective = 1 / rows.reduce((t, r) => t + r.p * r.p, 0);
+    return { rows, effective };
+  }
+  function simulate(states, cfg, n, seedBase) {
+    const count = new Map(), runsWith = new Map(), turns = { 2: 0, 3: 0, 4: 0 };
+    let cands = 0, sameTopRuns = 0;
+    for (let i = 0; i < n; i++) {
+      const run = drawRun(states, cfg, seedBase + ':' + i), tops = new Set();
+      let dupTop = false;
+      for (const { state } of run.rounds) {
+        count.set(state.key, (count.get(state.key) || 0) + 1);
+        runsWith.set(state.key, (runsWith.get(state.key) || 0) + 1);
+        turns[state.turn]++; cands += state.cands.length;
+        if (tops.has(state.top)) dupTop = true; tops.add(state.top);
+      }
+      if (dupTop) sameTopRuns++;
+    }
+    const rounds = n * 5;
+    const top = [...count.entries()].sort((a, b) => b[1] - a[1]).map(([key, c]) =>
+      ({ state: states.find(s => s.key === key), share: c / rounds, runs: runsWith.get(key) / n }));
+    return { n, rounds, turns, top, distinct: count.size, never: states.length - count.size,
+      avgCands: cands / rounds, sameTopRuns: sameTopRuns / n };
+  }
+  return { drawRun, odds, simulate, BUCKETS };
+})();
+
+/* ---------- The page: a thin shell over Draw. ---------- */
+const STATES = /*DATA*/null;
+const $ = id => document.getElementById(id);
+const BUCKET_LABEL = { '2': 'turn 2', '3': 'turn 3', '4': 'turn 4', '3+': 'turn 3+', 'any': 'any turn' };
+const DEFAULT = () => ({ alpha: 1, mode: 'schedule', schedule: ['2', '2', '3+', '3+', '3+'], depth: { '2': 40, '3': 50, '4': 10 }, noRepeatTop: false });
+let cfg = DEFAULT(), seed = newSeed(), lastRun = null, lastSim = null, prevSummary = '';
+
+function newSeed() { return Math.random().toString(36).slice(2, 8); }
+function alphaName(a) { return a === 1 ? 'Path frequency' : a === 0 ? 'uniform' : a === 0.5 ? 'square root' : 'blend'; }
+function describe(c) {
+  let s = `Weight = Candidates<sup>${c.alpha.toFixed(2)}</sup> (${alphaName(c.alpha)}). `;
+  if (c.mode === 'schedule') {
+    const groups = []; c.schedule.forEach((b, i) => {
+      const g = groups[groups.length - 1];
+      if (g && g.b === b) g.to = i + 1; else groups.push({ b, from: i + 1, to: i + 1 }); });
+    s += groups.map(g => `Round${g.from === g.to ? ' ' + g.from : 's ' + g.from + '–' + g.to} draw from ${BUCKET_LABEL[g.b]}`).join('; ') + '. ';
+  } else if (c.mode === 'random') {
+    s += `Each Round first picks a turn: turn 2 ${c.depth['2']}%, turn 3 ${c.depth['3']}%, turn 4 ${c.depth['4']}%. `;
+  } else s += 'Every Round draws from all turns together. ';
+  s += c.noRepeatTop ? 'No state repeats, and no two Rounds share a first row.' : 'No state repeats within a Run.';
+  return s;
+}
+function tiles(word, pattern) {
+  return '<div class="tiles">' + [...word].map((ch, i) => `<span class="t ${pattern ? pattern[i] : 'q'}">${ch}</span>`).join('') + '</div>';
+}
+function stateBoard(s) {
+  return s.rows.map(([g, p]) => tiles(g, p)).join('') + tiles('?????', null);
+}
+function oneIn(p) { return p >= 0.995 ? 'certain' : '1 in ' + (1 / p).toFixed(1 / p < 10 ? 1 : 0); }
+
+function render(what) {
+  const sum = describe(cfg);
+  $('summary').innerHTML = sum;
+  $('changed').textContent = what || '';
+  $('alpha').value = cfg.alpha; $('alphaOut').textContent = cfg.alpha.toFixed(2);
+  document.querySelectorAll('input[name=mode]').forEach(r => r.checked = r.value === cfg.mode);
+  $('scheduleRow').style.display = cfg.mode === 'schedule' ? '' : 'none';
+  $('randomRow').style.display = cfg.mode === 'random' ? '' : 'none';
+  $('scheduleRow').innerHTML = '<span class="muted">Turn per Round:</span>' + cfg.schedule.map((b, i) =>
+    `<label>R${i + 1} <select data-round="${i}">${['2', '3', '4', '3+', 'any'].map(o => `<option value="${o}"${o === b ? ' selected' : ''}>${BUCKET_LABEL[o]}</option>`).join('')}</select></label>`).join('');
+  $('scheduleRow').querySelectorAll('select').forEach(el => el.onchange = () => { cfg.schedule[+el.dataset.round] = el.value; changed(`Round ${+el.dataset.round + 1} now draws from ${BUCKET_LABEL[el.value]}.`); });
+  $('p2').value = cfg.depth['2']; $('p3').value = cfg.depth['3']; $('p4').value = cfg.depth['4'];
+  $('noTop').checked = cfg.noRepeatTop;
+  $('seed').value = seed;
+  renderRun(); renderOdds(); renderSim();
+}
+function changed(msg) { lastSim = null; render(msg); }
+
+function renderRun() {
+  if (!lastRun) return;
+  $('run').innerHTML = lastRun.rounds.map(r => `
+    <div class="card">
+      <h3>Round ${r.round} · ${BUCKET_LABEL[r.bucket]}</h3>
+      ${stateBoard(r.state)}
+      <div class="small" style="margin-top:6px"><b>${r.state.cands.length}</b> Candidates · turn ${r.state.turn}</div>
+      <div class="small muted">Tree plays <b>${r.state.guess.toUpperCase()}</b></div>
+      <div class="small muted">Chance this Round: ${oneIn(r.p)}</div>
+      <div class="small muted">The dice Answer: ${r.answer.toUpperCase()}</div>
+      ${r.relaxed ? '<div class="small" style="color:var(--accent)">Rule relaxed: every first row was used</div>' : ''}
+    </div>`).join('');
+}
+function renderOdds() {
+  const b = $('oddsBucket').value || '2';
+  const { rows, effective } = Draw.odds(STATES, cfg.alpha, b);
+  const max = rows[0].p;
+  const line = r => `<tr><td>${r.state.rows.map(([g, p]) => g.toUpperCase() + ' ' + p).join(' → ')}</td>
+    <td class="n">${r.state.cands.length}</td><td style="width:90px"><div class="bar" style="width:${(r.p / max * 100).toFixed(0)}%"></div></td><td class="n">${oneIn(r.p)}</td></tr>`;
+  $('odds').innerHTML = `<p class="small muted">${rows.length} states in this bucket. They behave like <b>${effective.toFixed(0)}</b> equally likely states (effective number), so a higher number means more variety.</p>
+    <table><tr><th>Game state</th><th>Cands</th><th></th><th>Chance</th></tr>
+    ${rows.slice(0, 8).map(line).join('')}
+    <tr><td colspan="4" class="muted">… ${rows.length - 11} more …</td></tr>
+    ${rows.slice(-3).map(line).join('')}</table>`;
+}
+function renderSim() {
+  if (!lastSim) { $('sim').innerHTML = '<p class="muted">Press “Simulate 1,000 Runs”.</p>'; return; }
+  const s = lastSim, pct = x => (x * 100).toFixed(1) + '%';
+  $('sim').innerHTML = `
+    <div class="kpis">
+      <div class="kpi"><b>${s.distinct}</b><span class="small muted">of 283 states ever seen</span></div>
+      <div class="kpi"><b>${s.never}</b><span class="small muted">never seen</span></div>
+      <div class="kpi"><b>${s.avgCands.toFixed(1)}</b><span class="small muted">avg Candidates per Round</span></div>
+      <div class="kpi"><b>${pct(s.sameTopRuns)}</b><span class="small muted">Runs with a repeated first row</span></div>
+    </div>
+    <p class="small">Rounds by turn: turn 2 <b>${pct(s.turns[2] / s.rounds)}</b> · turn 3 <b>${pct(s.turns[3] / s.rounds)}</b> · turn 4 <b>${pct(s.turns[4] / s.rounds)}</b></p>
+    <table><tr><th>Most drawn</th><th>Cands</th><th class="n">of Rounds</th><th class="n">Runs with it</th></tr>
+    ${s.top.slice(0, 10).map(r => `<tr><td>${r.state.rows.map(([g, p]) => g.toUpperCase() + ' ' + p).join(' → ')}</td><td class="n">${r.state.cands.length}</td><td class="n">${pct(r.share)}</td><td class="n">${pct(r.runs)}</td></tr>`).join('')}
+    </table>`;
+}
+
+/* Free play wiring */
+$('oddsBucket').innerHTML = ['2', '3', '4', '3+', 'any'].map(b => `<option value="${b}">${BUCKET_LABEL[b]}</option>`).join('');
+$('oddsBucket').onchange = () => renderOdds();
+$('alpha').oninput = e => { cfg.alpha = +e.target.value; changed(`Weighting set to α = ${cfg.alpha.toFixed(2)}.`); };
+document.querySelectorAll('[data-alpha]').forEach(b => b.onclick = () => { cfg.alpha = +b.dataset.alpha; changed(`Weighting set to ${alphaName(cfg.alpha)}.`); });
+document.querySelectorAll('input[name=mode]').forEach(r => r.onchange = () => { cfg.mode = r.value; changed('How Rounds pick a turn changed.'); });
+['2', '3', '4'].forEach(t => $('p' + t).onchange = e => { cfg.depth[t] = +e.target.value; changed(`Chance of turn ${t} set to ${e.target.value}%.`); });
+$('noTop').onchange = e => { cfg.noRepeatTop = e.target.checked; changed(e.target.checked ? 'Rounds now avoid sharing a first row.' : 'Rounds may share a first row again.'); };
+$('seed').onchange = e => { seed = e.target.value; };
+function draw(fresh) { if (fresh) seed = newSeed(); lastRun = Draw.drawRun(STATES, cfg, seed); render(`Drew a Run with seed “${seed}”.`); }
+function sim() { lastSim = Draw.simulate(STATES, cfg, 1000, 'sim'); render('Simulated 1,000 Runs with these settings.'); }
+$('drawBtn').onclick = () => draw(true);
+$('redrawBtn').onclick = () => draw(false);
+$('simBtn').onclick = sim;
+
+/* Guided walkthroughs */
+const set = (patch, msg) => () => { Object.assign(cfg, patch); lastSim = null; render(msg); };
+const SCENARIOS = [
+  { name: '1 · Path frequency (the default)', text: 'The starting point: Rounds 1–2 from turn 2, Rounds 3–5 from turn 3+, weighted by Path frequency. Watch how often the big turn-2 states come up (SALET → all grey, then COURD, with 221 Candidates), and how rarely you meet a 3-Candidate oddity.',
+    steps: [['Reset to the default', () => { cfg = DEFAULT(); lastRun = null; lastSim = null; render('Reset to the default settings.'); }],
+      ['Draw a Run', () => draw(true)], ['Draw another', () => draw(true)], ['Simulate 1,000 Runs', sim]] },
+  { name: '2 · Uniform', text: 'Every Eligible Game state is equally likely. Variety goes up, but you mostly meet small, rare states that real games almost never reach. Compare “avg Candidates per Round” and the “most drawn” table with scenario 1.',
+    steps: [['Reset to the default', () => { cfg = DEFAULT(); render('Reset.'); }], ['Set weighting to uniform', set({ alpha: 0 }, 'Weighting set to uniform.')],
+      ['Draw a Run', () => draw(true)], ['Simulate 1,000 Runs', sim]] },
+  { name: '3 · Square root middle', text: 'Weight = √Candidates. Common states still lead, but the long tail turns up regularly. In the odds table for turn 2, the gap between the 221-Candidate state and a 3-Candidate one shrinks from 74× to about 9×.',
+    steps: [['Reset to the default', () => { cfg = DEFAULT(); render('Reset.'); }], ['Set weighting to square root', set({ alpha: 0.5 }, 'Weighting set to square root.')],
+      ['Draw a Run', () => draw(true)], ['Simulate 1,000 Runs', sim]] },
+  { name: '4 · No shared first row', text: 'With Path frequency, two turn-3 Rounds often come from the same SALET feedback (for example both after all grey), so the Run feels repetitive. Turn on the rule and watch “Runs with a repeated first row” drop to 0.',
+    steps: [['Reset to the default', () => { cfg = DEFAULT(); render('Reset.'); }], ['Simulate 1,000 Runs without the rule', sim],
+      ['Turn on “no shared first row”', set({ noRepeatTop: true }, 'Rounds now avoid sharing a first row.')], ['Simulate 1,000 Runs with the rule', sim], ['Draw a Run', () => draw(true)]] },
+  { name: '5 · Random turn each Round', text: 'Instead of a fixed ramp, each Round rolls its turn (40% turn 2, 50% turn 3, 10% turn 4). Turn 4 has only 6 states, so watch them repeat across Runs, and notice that a Run can start at turn 3 and end at turn 2.',
+    steps: [['Reset to the default', () => { cfg = DEFAULT(); render('Reset.'); }], ['Switch to a random turn each Round', set({ mode: 'random' }, 'Each Round now rolls its turn.')],
+      ['Draw a Run', () => draw(true)], ['Draw another', () => draw(true)], ['Simulate 1,000 Runs', sim]] },
+];
+let tab = 0;
+function renderTabs() {
+  $('tabs').innerHTML = SCENARIOS.map((s, i) => `<button class="${i === tab ? 'on' : ''}" data-tab="${i}">${s.name}</button>`).join('');
+  $('tabs').querySelectorAll('button').forEach(b => b.onclick = () => { tab = +b.dataset.tab; renderTabs(); });
+  const s = SCENARIOS[tab];
+  $('scenario').innerHTML = `<p>${s.text}</p><div class="steps">${s.steps.map(([label], i) => `<button data-step="${i}" ${i ? 'disabled' : ''}>${i + 1}. ${label}</button>`).join('')}</div>`;
+  const btns = [...$('scenario').querySelectorAll('button')];
+  btns.forEach((b, i) => b.onclick = () => { s.steps[i][1](); b.classList.add('done'); if (btns[i + 1]) btns[i + 1].disabled = false; });
+}
+renderTabs();
+render();
+</script>
+</body>
+</html>

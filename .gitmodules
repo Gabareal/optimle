@@ -1,0 +1,3 @@
+[submodule "packages/pipeline/vendor/wordle"]
+	path = packages/pipeline/vendor/wordle
+	url = https://github.com/alex1770/wordle

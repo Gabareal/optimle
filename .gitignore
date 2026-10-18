@@ -1,0 +1,6 @@
+node_modules/
+dist/
+*.tsbuildinfo
+.DS_Store
+# solver build output, caches and scratch runs
+packages/pipeline/.solver/
